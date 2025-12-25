@@ -29,15 +29,15 @@
     --color-error: #d32f2f;
 
     /* === Spacing === */
-    --spacing-xs: 0.25rem;
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
 
     /* === Typography === */
     --font-mono: 'SF Mono', Monaco, monospace;
-    --font-size-xs: 12px;
-    --font-size-sm: 13px;
-    --font-size-base: 14px;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.8125rem;
+    --font-size-base: 0.875rem;
 }
 
 /* Dark Mode - automatically applied when user's system prefers dark mode */
