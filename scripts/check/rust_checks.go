@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// RustfmtCheck checks Rust code formatting.
+// RustfmtCheck formats Rust code.
 type RustfmtCheck struct{}
 
 func (c *RustfmtCheck) Name() string {
@@ -16,32 +16,26 @@ func (c *RustfmtCheck) Name() string {
 
 func (c *RustfmtCheck) Run(ctx *CheckContext) error {
 	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
-	cmd := exec.Command("cargo", "fmt", "--check")
+	var cmd *exec.Cmd
+	if ctx.CI {
+		cmd = exec.Command("cargo", "fmt", "--check")
+	} else {
+		cmd = exec.Command("cargo", "fmt")
+	}
 	cmd.Dir = rustDir
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
 		fmt.Print(indentOutput(output, "      "))
-		if !ctx.CI {
-			// Auto-fix
-			fixCmd := exec.Command("cargo", "fmt")
-			fixCmd.Dir = rustDir
-			if fixErr := fixCmd.Run(); fixErr != nil {
-				return fmt.Errorf("failed to run cargo fmt: %w", fixErr)
-			}
-			// Re-check
-			recheckCmd := exec.Command("cargo", "fmt", "--check")
-			recheckCmd.Dir = rustDir
-			if _, recheckErr := runCommand(recheckCmd, true); recheckErr == nil {
-				return nil // Fixed
-			}
+		if ctx.CI {
+			return fmt.Errorf("code is not formatted, run cargo fmt locally")
 		}
-		return fmt.Errorf("rust code needs formatting")
+		return fmt.Errorf("rust formatting failed")
 	}
 	return nil
 }
 
-// ClippyCheck runs Clippy linter.
+// ClippyCheck runs Clippy linter with auto-fix.
 type ClippyCheck struct{}
 
 func (c *ClippyCheck) Name() string {
@@ -50,13 +44,21 @@ func (c *ClippyCheck) Name() string {
 
 func (c *ClippyCheck) Run(ctx *CheckContext) error {
 	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
-	cmd := exec.Command("cargo", "clippy", "--", "-D", "warnings")
+	var cmd *exec.Cmd
+	if ctx.CI {
+		cmd = exec.Command("cargo", "clippy", "--", "-D", "warnings")
+	} else {
+		cmd = exec.Command("cargo", "clippy", "--fix", "--allow-dirty", "--allow-staged", "--", "-D", "warnings")
+	}
 	cmd.Dir = rustDir
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
 		fmt.Print(indentOutput(output, "      "))
-		return fmt.Errorf("clippy check failed")
+		if ctx.CI {
+			return fmt.Errorf("clippy errors found, run the check script locally")
+		}
+		return fmt.Errorf("clippy found unfixable issues")
 	}
 	return nil
 }

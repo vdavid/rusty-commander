@@ -3,10 +3,9 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
-// PrettierCheck checks code formatting with Prettier.
+// PrettierCheck formats code with Prettier.
 type PrettierCheck struct{}
 
 func (c *PrettierCheck) Name() string {
@@ -14,37 +13,26 @@ func (c *PrettierCheck) Name() string {
 }
 
 func (c *PrettierCheck) Run(ctx *CheckContext) error {
-	// Check from project root (Svelte project is at root level)
-	checkCmd := exec.Command("pnpm", "format:check")
-	checkCmd.Dir = ctx.RootDir
-	output, err := runCommand(checkCmd, true)
-
+	var cmd *exec.Cmd
+	if ctx.CI {
+		cmd = exec.Command("pnpm", "format:check")
+	} else {
+		cmd = exec.Command("pnpm", "format")
+	}
+	cmd.Dir = ctx.RootDir
+	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
 		fmt.Print(indentOutput(output, "      "))
-
-		if !ctx.CI {
-			// Auto-fix
-			formatCmd := exec.Command("pnpm", "format")
-			formatCmd.Dir = ctx.RootDir
-			formatCmd.Stdout = nil
-			formatCmd.Stderr = nil
-			if formatErr := formatCmd.Run(); formatErr != nil {
-				return fmt.Errorf("failed to run pnpm format: %w", formatErr)
-			}
-			// Re-check
-			recheckCmd := exec.Command("pnpm", "format:check")
-			recheckCmd.Dir = ctx.RootDir
-			if _, recheckErr := runCommand(recheckCmd, true); recheckErr == nil {
-				return nil // Fixed
-			}
+		if ctx.CI {
+			return fmt.Errorf("code is not formatted, run pnpm format locally")
 		}
-		return fmt.Errorf("prettier check failed")
+		return fmt.Errorf("prettier formatting failed")
 	}
 	return nil
 }
 
-// ESLintCheck checks code with ESLint.
+// ESLintCheck lints and fixes code with ESLint.
 type ESLintCheck struct{}
 
 func (c *ESLintCheck) Name() string {
@@ -52,36 +40,21 @@ func (c *ESLintCheck) Name() string {
 }
 
 func (c *ESLintCheck) Run(ctx *CheckContext) error {
-	checkCmd := exec.Command("pnpm", "lint")
-	checkCmd.Dir = ctx.RootDir
-	output, err := runCommand(checkCmd, true)
-
+	var cmd *exec.Cmd
+	if ctx.CI {
+		cmd = exec.Command("pnpm", "lint")
+	} else {
+		cmd = exec.Command("pnpm", "lint:fix")
+	}
+	cmd.Dir = ctx.RootDir
+	output, err := runCommand(cmd, true)
 	if err != nil {
-		if strings.TrimSpace(output) != "" {
-			fmt.Println()
-			fmt.Print(indentOutput(output, "      "))
-		} else {
-			fmt.Println()
-			fmt.Println("    ESLint found errors. Run: pnpm lint")
+		fmt.Println()
+		fmt.Print(indentOutput(output, "      "))
+		if ctx.CI {
+			return fmt.Errorf("lint errors found, run pnpm lint:fix locally")
 		}
-
-		if !ctx.CI {
-			// Auto-fix
-			fixCmd := exec.Command("pnpm", "lint:fix")
-			fixCmd.Dir = ctx.RootDir
-			fixCmd.Stdout = nil
-			fixCmd.Stderr = nil
-			if fixErr := fixCmd.Run(); fixErr != nil {
-				return fmt.Errorf("failed to run pnpm lint:fix: %w", fixErr)
-			}
-			// Re-check
-			recheckCmd := exec.Command("pnpm", "lint")
-			recheckCmd.Dir = ctx.RootDir
-			if _, recheckErr := runCommand(recheckCmd, true); recheckErr == nil {
-				return nil // Fixed
-			}
-		}
-		return fmt.Errorf("eslint check failed")
+		return fmt.Errorf("eslint found unfixable errors")
 	}
 	return nil
 }
