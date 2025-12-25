@@ -2,16 +2,17 @@
 
 ![License](https://img.shields.io/github/license/vdavid/rusty-commander)
 
-An extremely fast, keyboard-driven, two-pane file manager written in Rust for folks who miss the golden days of
-Norton Commander and Total Commander.
+An extremely fast, keyboard-driven, two-pane file manager written in Rust for folks who miss the golden days of Norton
+Commander and Total Commander.
 
 ## Overview
 
-Rusty Commander is a desktop file manager that brings back the classic two-pane layout.
-It's built for speed and keyboard navigation.
-If you've ever used Norton Commander, Midnight Commander, or Total Commander, you'll feel right at home.
+Rusty Commander is a desktop file manager that brings back the classic two-pane layout. It's built for speed and
+keyboard navigation. If you've ever used Norton Commander, Midnight Commander, or Total Commander, you'll feel right at
+home.
 
 Core features:
+
 - **Two-pane layout**: see two directories side by side
 - **Keyboard-first navigation**: do everything without touching your mouse
 - **Fast file operations**: copy, move, rename, and delete with a few keystrokes
@@ -19,7 +20,8 @@ Core features:
 
 ## Installation
 
-Download the latest release for your platform from the [Releases](https://github.com/vdavid/rusty-commander/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/vdavid/rusty-commander/releases)
+page.
 
 ### macOS
 
@@ -46,7 +48,7 @@ flatpak install rusty-commander
 Launch Rusty Commander and start navigating:
 
 | Key     | Action               |
-|---------|----------------------|
+| ------- | -------------------- |
 | `Tab`   | Switch between panes |
 | `↑` `↓` | Navigate files       |
 | `Enter` | Open file/folder     |
@@ -62,8 +64,8 @@ frontend. This gives it native performance with a modern, responsive UI.
 
 ## Contributing
 
-Contributions are welcome!
-Report issues and feature requests in the [issue tracker](https://github.com/vdavid/rusty-commander/issues).
+Contributions are welcome! Report issues and feature requests in the
+[issue tracker](https://github.com/vdavid/rusty-commander/issues).
 
 Happy browsing!
 

@@ -1,5 +1,5 @@
 [tools]
-node = "24"
+node = "25"
 pnpm = "10"
 go = "1.25"
 # Rust is managed by rustup via rust-toolchain.toml

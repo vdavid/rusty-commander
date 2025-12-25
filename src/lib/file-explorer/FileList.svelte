@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { FileEntry } from '$lib/types'
+    import type { FileEntry } from './types'
 
     interface Props {
         files: FileEntry[]
