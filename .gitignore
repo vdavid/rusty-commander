@@ -18,8 +18,8 @@
 node_modules
 
 # SvelteKit build files
-/build
-/.svelte-kit
-/package
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+.svelte-kit/
+
+# Test results
+playwright-report/
+test-results/
