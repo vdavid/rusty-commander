@@ -84,6 +84,9 @@ See [docs/adr](docs/adr) for all key technical decisions, and the
   [ADR-003](docs/adr/003-disable-cargo-deny-advisories.md)
 - **Prettier, ESLint, rustfmt, clippy** all auto-fix locally but only check in CI (enforced by `--ci` flag). See
   [ADR-004](docs/adr/004-auto-fix-locally-check-in-ci.md)
+- **Scoped CSS for file explorer, Tailwind for other UI**: File list components use scoped CSS for performance with
+  large lists (50k+ files), while other UI (settings, modals) uses Tailwind. See
+  [ADR-005](docs/adr/005-scoped-css-for-file-explorer.md)
 - **Clippy `--allow-dirty --allow-staged`** is used locally to allow auto-fixes even with uncommitted changes
 
 ## Useful references

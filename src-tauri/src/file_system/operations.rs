@@ -8,6 +8,7 @@ use std::path::Path;
 
 /// Represents a file or directory entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub name: String,
     pub path: String,
@@ -22,7 +23,8 @@ pub struct FileEntry {
 /// * `path` - The directory path to list
 ///
 /// # Returns
-/// A vector of FileEntry representing the directory contents
+/// A vector of FileEntry representing the directory contents, sorted with directories first,
+/// then files, both alphabetically.
 pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
     let mut entries = Vec::new();
 
@@ -43,6 +45,13 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
             modified_at: modified,
         });
     }
+
+    // Sort: directories first, then files, both alphabetically
+    entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
 
     Ok(entries)
 }

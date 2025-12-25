@@ -1,24 +1,27 @@
 //! Tests for file system operations
 
-use super::operations::list_directory;
+use super::provider::FileSystemProvider;
+use super::real_provider::RealFileSystemProvider;
 use std::fs;
 
 #[test]
 fn test_list_directory() {
+    let provider = RealFileSystemProvider;
     let temp_dir = std::env::temp_dir();
-    let result = list_directory(&temp_dir);
+    let result = provider.list_directory(&temp_dir);
     assert!(result.is_ok());
 }
 
 #[test]
 fn test_list_directory_entries_have_names() {
+    let provider = RealFileSystemProvider;
     let temp_dir = std::env::temp_dir().join("rusty_commander_ops_test");
     fs::create_dir_all(&temp_dir).unwrap();
 
     let test_file = temp_dir.join("test_file.txt");
     fs::write(&test_file, "content").unwrap();
 
-    let entries = list_directory(&temp_dir).unwrap();
+    let entries = provider.list_directory(&temp_dir).unwrap();
 
     // Cleanup
     let _ = fs::remove_file(&test_file);
