@@ -20,6 +20,9 @@ node_modules
 # SvelteKit build files
 .svelte-kit/
 
+# Tauri build files
+build/
+
 # Test results
 playwright-report/
 test-results/
