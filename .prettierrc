@@ -4,12 +4,20 @@
     "semi": false,
     "singleQuote": true,
     "quoteProps": "as-needed",
-    "jsxSingleQuote": true,
     "trailingComma": "all",
     "bracketSpacing": true,
     "bracketSameLine": false,
     "arrowParens": "always",
     "endOfLine": "lf",
     "printWidth": 120,
-    "proseWrap": "always"
+    "proseWrap": "always",
+    "plugins": ["prettier-plugin-svelte"],
+    "overrides": [
+        {
+            "files": "*.svelte",
+            "options": {
+                "parser": "svelte"
+            }
+        }
+    ]
 }

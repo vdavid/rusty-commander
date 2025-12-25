@@ -1,3 +1,25 @@
+
+# VS Code
+.vscode/
+
 # IntelliJ IDEA project files
 .idea/
 /*.iml
+
+# macOS system files
+.DS_Store
+
+# .env files
+.env
+.env.*
+!.env.example
+
+# Node modules
+node_modules
+
+# SvelteKit build files
+/build
+/.svelte-kit
+/package
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*

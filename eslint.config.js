@@ -1,41 +1,26 @@
 import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import react from 'eslint-plugin-react'
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
 import prettier from 'eslint-plugin-prettier'
 import prettierConfig from 'eslint-config-prettier'
 import tseslint from 'typescript-eslint'
-import importPlugin from 'eslint-plugin-import'
+import svelte from 'eslint-plugin-svelte'
+import svelteParser from 'svelte-eslint-parser'
+import globals from 'globals'
 
-export default [
+export default tseslint.config(
     {
-        ignores: ['dist'],
+        ignores: ['dist', 'build', '.svelte-kit', 'node_modules', 'src-tauri/target'],
     },
     js.configs.recommended,
     prettierConfig,
-    ...tseslint.configs.strictTypeChecked.map(config => ({
+    ...tseslint.configs.strictTypeChecked.map((config) => ({
         ...config,
-        files: ['**/*.{ts,tsx}'],
+        files: ['**/*.{ts,tsx,svelte}'],
     })),
-    {
-        ...reactX.configs['recommended-typescript'],
-        files: ['**/*.{ts,tsx}'],
-    },
-    {
-        ...reactDom.configs.recommended,
-        files: ['**/*.{ts,tsx}'],
-    },
+    ...svelte.configs['flat/recommended'],
     {
         files: ['**/*.{ts,tsx}'],
         plugins: {
             '@typescript-eslint': tseslint.plugin,
-            react,
-            'react-hooks': reactHooks,
-            'react-refresh': reactRefresh,
-            import: importPlugin,
             prettier,
         },
         languageOptions: {
@@ -47,33 +32,11 @@ export default [
                 ...globals.es2021,
             },
             parserOptions: {
-                ecmaFeatures: {
-                    jsx: true,
-                },
-                project: ['./tsconfig.node.json', './tsconfig.app.json', './tsconfig.e2e.json'],
+                projectService: true,
                 tsconfigRootDir: import.meta.dirname,
             },
         },
-        settings: {
-            react: {
-                version: 'detect',
-            },
-        },
         rules: {
-            ...reactHooks.configs.recommended.rules,
-            'react/react-in-jsx-scope': 'off',
-            'react/jsx-key': 'error',
-            'react/jsx-no-duplicate-props': 'error',
-            'react/jsx-no-undef': 'error',
-            'react/jsx-uses-react': 'off',
-            'react/jsx-uses-vars': 'error',
-            'react/no-array-index-key': 'warn',
-            'react/no-danger': 'warn',
-            'react/no-deprecated': 'error',
-            'react/no-direct-mutation-state': 'error',
-            'react/no-unknown-property': 'error',
-            'react/prop-types': 'off',
-            'react-dom/no-dangerously-set-innerhtml': 'warn',
             'prettier/prettier': 'error',
             '@typescript-eslint/no-unused-vars': 'error',
             '@typescript-eslint/no-unsafe-assignment': 'error',
@@ -86,25 +49,6 @@ export default [
             '@typescript-eslint/require-await': 'error',
             '@typescript-eslint/no-explicit-any': 'error',
             'no-console': 'warn',
-            // Prettier handles "quotes", "jsx-quotes", "indent", "semi", and "comma-dangle".
-            'import/order': [
-                'error',
-                {
-                    groups: [
-                        'builtin',
-                        'external',
-                        'internal',
-                        'parent',
-                        'sibling',
-                        'index',
-                    ],
-                    'newlines-between': 'always',
-                    alphabetize: {
-                        order: 'asc',
-                        caseInsensitive: true,
-                    },
-                },
-            ],
             complexity: [
                 'warn',
                 {
@@ -114,16 +58,26 @@ export default [
         },
     },
     {
-        files: ['scripts/**/*.mjs'],
+        files: ['**/*.svelte'],
         languageOptions: {
-            globals: {
-                ...globals.node,
+            parser: svelteParser,
+            parserOptions: {
+                parser: tseslint.parser,
+                projectService: true,
+                tsconfigRootDir: import.meta.dirname,
+                extraFileExtensions: ['.svelte'],
             },
-            ecmaVersion: 'latest',
-            sourceType: 'module',
         },
         rules: {
-            'no-console': 'off', // Scripts can use console
+            'prettier/prettier': 'error',
+            '@typescript-eslint/no-unused-vars': 'error',
+            'no-console': 'warn',
+            complexity: [
+                'warn',
+                {
+                    max: 15,
+                },
+            ],
         },
     },
-]
+)
