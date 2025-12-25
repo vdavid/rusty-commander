@@ -9,16 +9,15 @@ import (
 
 func main() {
 	var (
-		backendOnly   = flag.Bool("backend", false, "Run only backend checks")
-		backendOnly2  = flag.Bool("backend-only", false, "Run only backend checks")
-		frontendOnly  = flag.Bool("frontend", false, "Run only frontend checks")
-		frontendOnly2 = flag.Bool("frontend-only", false, "Run only frontend checks")
-		docsOnly      = flag.Bool("docs", false, "Run only docs checks")
-		checkName     = flag.String("check", "", "Run a single check by name")
-		ciMode        = flag.Bool("ci", false, "Disable auto-fixing (for CI)")
-		verbose       = flag.Bool("verbose", false, "Show detailed output")
-		help          = flag.Bool("help", false, "Show help message")
-		h             = flag.Bool("h", false, "Show help message")
+		rustOnly    = flag.Bool("rust", false, "Run only Rust checks")
+		rustOnly2   = flag.Bool("rust-only", false, "Run only Rust checks")
+		svelteOnly  = flag.Bool("svelte", false, "Run only Svelte checks")
+		svelteOnly2 = flag.Bool("svelte-only", false, "Run only Svelte checks")
+		checkName   = flag.String("check", "", "Run a single check by name")
+		ciMode      = flag.Bool("ci", false, "Disable auto-fixing (for CI)")
+		verbose     = flag.Bool("verbose", false, "Show detailed output")
+		help        = flag.Bool("help", false, "Show help message")
+		h           = flag.Bool("h", false, "Show help message")
 	)
 	flag.Parse()
 
@@ -64,20 +63,13 @@ func main() {
 	}
 
 	// Determine what to run
-	runBackend := true
-	runFrontend := true
-	runDocs := true
-	if *backendOnly || *backendOnly2 {
-		runFrontend = false
-		runDocs = false
+	runRust := true
+	runSvelte := true
+	if *rustOnly || *rustOnly2 {
+		runSvelte = false
 	}
-	if *frontendOnly || *frontendOnly2 {
-		runBackend = false
-		runDocs = false
-	}
-	if *docsOnly {
-		runBackend = false
-		runFrontend = false
+	if *svelteOnly || *svelteOnly2 {
+		runRust = false
 	}
 
 	fmt.Println("🔍 Running all checks...")
@@ -87,21 +79,15 @@ func main() {
 	var failed bool
 	var allFailedChecks []string
 
-	if runBackend {
-		backendFailed, failedChecks := runBackendChecks(ctx)
-		failed = backendFailed
+	if runRust {
+		rustFailed, failedChecks := runRustChecks(ctx)
+		failed = rustFailed
 		allFailedChecks = append(allFailedChecks, failedChecks...)
 	}
 
-	if runFrontend {
-		frontendFailed, failedChecks := runFrontendChecks(ctx)
-		failed = frontendFailed || failed
-		allFailedChecks = append(allFailedChecks, failedChecks...)
-	}
-
-	if runDocs {
-		docsFailed, failedChecks := runDocsChecks(ctx)
-		failed = docsFailed || failed
+	if runSvelte {
+		svelteFailed, failedChecks := runSvelteChecks(ctx)
+		failed = svelteFailed || failed
 		allFailedChecks = append(allFailedChecks, failedChecks...)
 	}
 
@@ -114,7 +100,7 @@ func main() {
 			fmt.Println()
 			fmt.Println("To rerun a specific check:")
 			for _, checkName := range allFailedChecks {
-				fmt.Printf("  ./scripts/check.sh --check %s\n", checkName)
+				fmt.Printf("  go run ./scripts/check --check %s\n", checkName)
 			}
 		}
 		os.Exit(1)

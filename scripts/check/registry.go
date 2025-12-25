@@ -8,24 +8,24 @@ func getCheckByName(name string) Check {
 
 	// Map CLI names (with dashes, case-insensitive) to check types
 	switch nameLower {
-	case "go-mod-tidy":
-		return &GoModTidyCheck{}
-	case "go-vet":
-		return &GoVetCheck{}
-	case "backend-tests":
-		return &BackendTestsCheck{}
-	case "frontend-tests":
-		return &FrontendTestsCheck{}
+	case "rustfmt":
+		return &RustfmtCheck{}
+	case "clippy":
+		return &ClippyCheck{}
+	case "cargo-audit":
+		return &CargoAuditCheck{}
+	case "cargo-deny":
+		return &CargoDenyCheck{}
+	case "rust-tests":
+		return &RustTestsCheck{}
+	case "prettier":
+		return &PrettierCheck{}
+	case "eslint":
+		return &ESLintCheck{}
+	case "svelte-tests":
+		return &SvelteTestsCheck{}
 	case "e2e-tests":
 		return &E2ETestsCheck{}
-	case "gocyclo":
-		return &GocycloCheck{}
-	case "nilaway":
-		return &NilawayCheck{}
-	case "hugo-build":
-		return &HugoBuildCheck{}
-	case "docs-links":
-		return &DocsLinksCheck{}
 	default:
 		// Try to find by exact name match (case-insensitive)
 		allChecks := getAllChecks()
@@ -42,43 +42,29 @@ func getCheckByName(name string) Check {
 // getAllChecks returns all available checks.
 func getAllChecks() []Check {
 	var checks []Check
-	checks = append(checks, getBackendChecks()...)
-	checks = append(checks, getFrontendChecks()...)
-	checks = append(checks, getDocsChecks()...)
+	checks = append(checks, getRustChecks()...)
+	checks = append(checks, getSvelteChecks()...)
 	return checks
 }
 
-// getBackendChecks returns all backend checks.
-func getBackendChecks() []Check {
+// getRustChecks returns all Rust checks.
+func getRustChecks() []Check {
 	return []Check{
-		&GofmtCheck{},
-		&GoModTidyCheck{},
-		&GovulncheckCheck{},
-		&GoVetCheck{},
-		&StaticcheckCheck{},
-		&IneffassignCheck{},
-		&MisspellCheck{},
-		&GocycloCheck{},
-		&NilawayCheck{},
-		&BackendTestsCheck{},
+		&RustfmtCheck{},
+		&ClippyCheck{},
+		&CargoAuditCheck{},
+		&CargoDenyCheck{},
+		&RustTestsCheck{},
 	}
 }
 
-// getFrontendChecks returns all frontend checks.
-func getFrontendChecks() []Check {
+// getSvelteChecks returns all Svelte checks.
+func getSvelteChecks() []Check {
 	return []Check{
 		&PrettierCheck{},
 		&ESLintCheck{},
-		&FrontendTestsCheck{},
+		&SvelteTestsCheck{},
 		&E2ETestsCheck{},
-	}
-}
-
-// getDocsChecks returns all docs checks.
-func getDocsChecks() []Check {
-	return []Check{
-		&HugoBuildCheck{},
-		&DocsLinksCheck{},
 	}
 }
 
@@ -87,25 +73,17 @@ func getCheckCLIName(check Check) string {
 	name := strings.ToLower(check.Name())
 	// Map check names to their CLI equivalents
 	switch name {
-	case "go mod tidy":
-		return "go-mod-tidy"
-	case "go vet":
-		return "go-vet"
 	case "tests":
-		// Need to determine if it's backend or frontend - check the type
+		// Determine if it's Rust or Svelte
 		switch check.(type) {
-		case *BackendTestsCheck:
-			return "backend-tests"
-		case *FrontendTestsCheck:
-			return "frontend-tests"
+		case *RustTestsCheck:
+			return "rust-tests"
+		case *SvelteTestsCheck:
+			return "svelte-tests"
 		}
 		return "tests"
 	case "e2e tests":
 		return "e2e-tests"
-	case "hugo build":
-		return "hugo-build"
-	case "docs links":
-		return "docs-links"
 	default:
 		return name
 	}
