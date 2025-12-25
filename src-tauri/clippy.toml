@@ -1,1 +1,4 @@
+# Clippy (Rust linter) configuration
+# Complexity threshold of 15 matches ESLint's complexity rule for consistency across Rust and TypeScript
 cognitive-complexity-threshold = 15
+

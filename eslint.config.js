@@ -1,3 +1,18 @@
+/**
+ * ESLint Configuration for Rusty Commander
+ *
+ * This config uses the flat config format (ESLint 9+) and enforces:
+ * - Strict TypeScript type checking for safety
+ * - Prettier integration for consistent formatting
+ * - Complexity limits (max 15) to keep functions maintainable
+ * - No unsafe operations (any, unsafe assignments, etc.)
+ *
+ * The config is split into multiple sections:
+ * 1. Global ignores (dist, build, etc.)
+ * 2. TypeScript files (strict type checking)
+ * 3. Config files (lighter rules)
+ * 4. Svelte files (Svelte-specific parsing + TypeScript)
+ */
 import js from '@eslint/js'
 import prettier from 'eslint-plugin-prettier'
 import prettierConfig from 'eslint-config-prettier'
@@ -38,17 +53,22 @@ export default tseslint.config(
         },
         rules: {
             'prettier/prettier': 'error',
+            // Type safety rules - we want to catch all unsafe operations at compile time
             '@typescript-eslint/no-unused-vars': 'error',
             '@typescript-eslint/no-unsafe-assignment': 'error',
             '@typescript-eslint/no-unsafe-call': 'error',
             '@typescript-eslint/no-unsafe-member-access': 'error',
             '@typescript-eslint/no-unsafe-return': 'error',
+            // Async/Promise safety - prevent common async bugs
             '@typescript-eslint/no-floating-promises': 'error',
             '@typescript-eslint/await-thenable': 'error',
             '@typescript-eslint/no-misused-promises': 'error',
             '@typescript-eslint/require-await': 'error',
+            // Explicit types - 'any' defeats the purpose of TypeScript
             '@typescript-eslint/no-explicit-any': 'error',
+            // Code quality - console.log should be removed before commit (warn, not error)
             'no-console': 'warn',
+            // Complexity limit - matches Rust clippy's cognitive-complexity-threshold
             complexity: [
                 'warn',
                 {

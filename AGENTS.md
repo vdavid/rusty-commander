@@ -23,6 +23,27 @@ Uses Rust, Tauri 2, Svelte 5, TypeScript, Tailwind 4. Targets macOS now, Win and
 - `/e2e/` - Playwright end-to-end tests
 - `/docs/` - Docs including `style-guide.md`
 
+### Guidelines
+
+- **Frontend components**: We keep them in `src/lib/` (SvelteKit convention)
+- **Routes**: In `src/routes/` (SvelteKit file-based routing)
+- **Rust modules**: We keep them in `src-tauri/src/`
+- **Static assets**: In `/static/`
+
+## Common tasks
+
+- Updating dependencies: see [here](docs/workflows/update-dependencies.md)
+- Adding a new Rust dependency: see [here](docs/workflows/add-rust-dependency.md)
+- Adding a new npm dependency: see [here](docs/workflows/add-npm-dependency.md)
+- Making key tech decisions: see [here](docs/workflows/making-key-tech-decisions.md) - Examples for when to use this:
+  choosing between competing libraries/frameworks; changing build/test processes; adopting conventions that differ from
+  defaults.
+- Running a specific Rust test: `cd src-tauri && cargo nextest run <test_name>`.
+- Running a specific Svelte test: `pnpm vitest run -t "<test_name>"`
+- Running a specific E2E test: `pnpm test:e2e --grep "<test_name>"` or `pnpm test:e2e <test-file>`
+- Debugging front end: Open dev console in running app (`Cmd+Option+I` on macOS). Use temp `console.log`s as needed.
+- Debugging Rust: Use `println!` or `dbg!` macros
+
 ## Code style
 
 ALWAYS read the [full style guide](docs/style-guide.md) before touching the repo!
@@ -41,56 +62,6 @@ Can also use `cargo fmt`, `cargo clippy`, `cargo audit`, `cargo deny check`, `ca
 
 GitHub Actions workflow in `.github/workflows/ci.yml`:
 
-## Deps management
-
-### Updating dependencies
-
-- Frontend: `ncu` to see them, then `ncu -u && pnpm install` to apply.
-- Rust (in `src-tauri/`): `cargo update && cargo outdated` (update within semver ranges; check for newer versions)
-- Current version constraints: see `.mise.toml`. We try to use the latest.
-- Rust: stable channel (see `rust-toolchain.toml`)
-
-## Common tasks
-
-### Adding a new Rust dependency
-
-1. Add to `src-tauri/Cargo.toml`
-2. Run `cargo build` to update `Cargo.lock`
-3. Check licenses with `cargo deny check licenses`
-
-### Adding a new npm dependency
-
-1. Run `pnpm add <package>` (or `pnpm add -D <package>` for dev deps)
-2. Commit both `package.json` and `pnpm-lock.yaml`
-
-### Running a specific test
-
-**Rust**:
-
-```bash
-cd src-tauri
-cargo nextest run <test_name>
-```
-
-**Svelte**:
-
-```bash
-pnpm vitest run -t "<test_name>"
-```
-
-### Debugging
-
-- Tauri dev tools: Open dev console in running app (Cmd+Option+I on macOS)
-- Rust logs: Use `println!` or `dbg!` macros
-- Frontend logs: Use `console.log` (but remember to remove before committing, ESLint warns)
-
-## File structure tips
-
-- **Frontend components**: Keep them in `src/lib/` (SvelteKit convention)
-- **Routes**: In `src/routes/` (SvelteKit file-based routing)
-- **Rust modules**: Keep them in `src-tauri/src/`
-- **Static assets**: In `/static/`
-
 ## Things to avoid
 
 - ❌ Don't commit without running `./scripts/check.sh`
@@ -100,13 +71,20 @@ pnpm vitest run -t "<test_name>"
 - ❌ Don't ignore linter warnings (fix them or justify with a comment)
 - ❌ Don't add dependencies without checking licenses (`cargo deny check`)
 
-## Quirks and gotchas
+## Decisions
 
-- **cargo-nextest** is used instead of `cargo test` for speed and better output
-- **deny.toml advisories check is off** because Tauri depends on unmaintained crates we can't control
-- **Check script is in Go** (not Bash) for better cross-platform support and maintainability
+See [docs/adr](docs/adr) for all key technical decisions, and the
+[How to document important technical decisions](docs/workflows/making-key-tech-decisions.md) process.
+
+- **Check script is in Go** (not Bash) for better cross-platform support and maintainability. See
+  [ADR-001](docs/adr/001-use-go-for-check-script.md)
+- **cargo-nextest** is used instead of `cargo test` for speed and better output. See
+  [ADR-002](docs/adr/002-use-cargo-nextest.md)
+- **deny.toml advisories check is off** because Tauri depends on unmaintained crates we can't control. See
+  [ADR-003](docs/adr/003-disable-cargo-deny-advisories.md)
+- **Prettier, ESLint, rustfmt, clippy** all auto-fix locally but only check in CI (enforced by `--ci` flag). See
+  [ADR-004](docs/adr/004-auto-fix-locally-check-in-ci.md)
 - **Clippy `--allow-dirty --allow-staged`** is used locally to allow auto-fixes even with uncommitted changes
-- **Prettier, ESLint, rustfmt, clippy** all auto-fix locally but only check in CI (enforced by `--ci` flag)
 
 ## Useful references
 
