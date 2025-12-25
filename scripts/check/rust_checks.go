@@ -135,7 +135,7 @@ func (c *CargoDenyCheck) Run(ctx *CheckContext) error {
 	return nil
 }
 
-// RustTestsCheck runs Rust tests.
+// RustTestsCheck runs Rust tests using cargo-nextest.
 type RustTestsCheck struct{}
 
 func (c *RustTestsCheck) Name() string {
@@ -144,7 +144,17 @@ func (c *RustTestsCheck) Name() string {
 
 func (c *RustTestsCheck) Run(ctx *CheckContext) error {
 	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
-	cmd := exec.Command("cargo", "test")
+
+	// Check if cargo-nextest is installed
+	if !commandExists("cargo-nextest") {
+		fmt.Printf("%sInstalling cargo-nextest...%s ", colorYellow, colorReset)
+		installCmd := exec.Command("cargo", "install", "cargo-nextest", "--locked")
+		if _, err := runCommand(installCmd, true); err != nil {
+			return fmt.Errorf("failed to install cargo-nextest: %w", err)
+		}
+	}
+
+	cmd := exec.Command("cargo", "nextest", "run")
 	cmd.Dir = rustDir
 	output, err := runCommand(cmd, true)
 	if err != nil {
