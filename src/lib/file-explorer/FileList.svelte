@@ -27,25 +27,25 @@
         margin: 0;
         padding: 0;
         overflow-y: auto;
-        font-family: 'SF Mono', Monaco, monospace;
-        font-size: 13px;
+        font-family: var(--font-mono) monospace;
+        font-size: var(--font-size-sm);
     }
 
     .file-entry {
-        padding: 0.25rem 0.5rem;
+        padding: var(--spacing-xs) var(--spacing-sm);
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: var(--spacing-sm);
         user-select: none;
     }
 
     .file-entry:hover {
-        background-color: rgba(0, 120, 215, 0.1);
+        background-color: var(--color-hover-bg);
     }
 
     .icon {
-        font-size: 14px;
+        font-size: var(--font-size-base);
         flex-shrink: 0;
     }
 

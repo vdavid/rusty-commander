@@ -60,22 +60,22 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        border: 1px solid #ccc;
+        border: 1px solid var(--color-border-primary);
     }
 
     .header {
-        padding: 0.5rem;
-        background-color: #f5f5f5;
-        border-bottom: 1px solid #ccc;
-        font-size: 12px;
+        padding: var(--spacing-sm);
+        background-color: var(--color-bg-secondary);
+        border-bottom: 1px solid var(--color-border-primary);
+        font-size: var(--font-size-xs);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .path {
-        font-family: 'SF Mono', Monaco, monospace;
-        color: #666;
+        font-family: var(--font-mono) monospace;
+        color: var(--color-text-secondary);
     }
 
     .content {
@@ -91,36 +91,13 @@
         align-items: center;
         justify-content: center;
         height: 100%;
-        color: #666;
-        font-size: 14px;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-base);
     }
 
     .error-message {
-        color: #d32f2f;
+        color: var(--color-error);
         text-align: center;
-        padding: 1rem;
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .file-pane {
-            border-color: #444;
-        }
-
-        .header {
-            background-color: #2a2a2a;
-            border-bottom-color: #444;
-        }
-
-        .path {
-            color: #aaa;
-        }
-
-        .message {
-            color: #aaa;
-        }
-
-        .error-message {
-            color: #f44336;
-        }
+        padding: var(--spacing-md);
     }
 </style>
