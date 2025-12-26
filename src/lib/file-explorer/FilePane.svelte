@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte'
+    import { onMount, untrack } from 'svelte'
     import type { FileEntry } from './types'
     import type { FileService } from '$lib/file-service'
     import { defaultFileService } from '$lib/file-service'
@@ -24,7 +24,7 @@
         onRequestFocus,
     }: Props = $props()
 
-    let currentPath = $state(initialPath)
+    let currentPath = $state(untrack(() => initialPath))
     let allFiles = $state<FileEntry[]>([])
     let loading = $state(true)
     let error = $state<string | null>(null)
@@ -151,8 +151,15 @@
     })
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_click_events_have_key_events -->
-<div class="file-pane" class:is-focused={isFocused} onclick={handlePaneClick} role="region" aria-label="File pane">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+    class="file-pane"
+    class:is-focused={isFocused}
+    onclick={handlePaneClick}
+    onkeydown={() => {}}
+    role="region"
+    aria-label="File pane"
+>
     <div class="header">
         <span class="path">{currentPath}</span>
     </div>
