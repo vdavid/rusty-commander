@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from 'svelte'
 import FileList from './FileList.svelte'
 import type { FileEntry } from './types'
 
 describe('FileList', () => {
-    it('renders file entries', () => {
+    const noop = () => {}
+
+    it('renders file entries with directories wrapped in brackets', () => {
         const files: FileEntry[] = [
             {
                 name: 'Documents',
@@ -19,9 +21,12 @@ describe('FileList', () => {
         ]
 
         const target = document.createElement('div')
-        mount(FileList, { target, props: { files } })
+        mount(FileList, {
+            target,
+            props: { files, selectedIndex: 0, onSelect: noop, onNavigate: noop },
+        })
 
-        expect(target.textContent).toContain('Documents')
+        expect(target.textContent).toContain('[Documents]')
         expect(target.textContent).toContain('file.txt')
     })
 
@@ -40,7 +45,10 @@ describe('FileList', () => {
         ]
 
         const target = document.createElement('div')
-        mount(FileList, { target, props: { files } })
+        mount(FileList, {
+            target,
+            props: { files, selectedIndex: 0, onSelect: noop, onNavigate: noop },
+        })
 
         const entries = target.querySelectorAll('.file-entry')
         expect(entries[0].classList.contains('is-directory')).toBe(true)
@@ -49,7 +57,10 @@ describe('FileList', () => {
 
     it('renders empty list', () => {
         const target = document.createElement('div')
-        mount(FileList, { target, props: { files: [] } })
+        mount(FileList, {
+            target,
+            props: { files: [], selectedIndex: 0, onSelect: noop, onNavigate: noop },
+        })
 
         expect(target.querySelector('.file-list')).toBeTruthy()
         expect(target.querySelectorAll('.file-entry')).toHaveLength(0)
@@ -65,9 +76,57 @@ describe('FileList', () => {
         ]
 
         const target = document.createElement('div')
-        mount(FileList, { target, props: { files } })
+        mount(FileList, {
+            target,
+            props: { files, selectedIndex: 0, onSelect: noop, onNavigate: noop },
+        })
 
         const icons = target.querySelectorAll('.icon')
         expect(icons.length).toBeGreaterThan(0)
+    })
+
+    it('shows selected state on correct item', () => {
+        const files: FileEntry[] = [
+            { name: 'a', path: '/a', isDirectory: false },
+            { name: 'b', path: '/b', isDirectory: false },
+        ]
+
+        const target = document.createElement('div')
+        mount(FileList, {
+            target,
+            props: { files, selectedIndex: 1, onSelect: noop, onNavigate: noop },
+        })
+
+        const entries = target.querySelectorAll('.file-entry')
+        expect(entries[0].classList.contains('is-selected')).toBe(false)
+        expect(entries[1].classList.contains('is-selected')).toBe(true)
+    })
+
+    it('formats parent directory as [..]', () => {
+        const files: FileEntry[] = [{ name: '..', path: '/home', isDirectory: true }]
+
+        const target = document.createElement('div')
+        mount(FileList, {
+            target,
+            props: { files, selectedIndex: 0, onSelect: noop, onNavigate: noop },
+        })
+
+        expect(target.textContent).toContain('[..]')
+    })
+
+    it('calls onSelect when item is clicked', () => {
+        const files: FileEntry[] = [{ name: 'test', path: '/test', isDirectory: false }]
+        const onSelect = vi.fn()
+
+        const target = document.createElement('div')
+        mount(FileList, {
+            target,
+            props: { files, selectedIndex: 0, onSelect, onNavigate: noop },
+        })
+
+        const entry = target.querySelector('.file-entry') as HTMLElement
+        entry.click()
+
+        expect(onSelect).toHaveBeenCalledWith(0)
     })
 })

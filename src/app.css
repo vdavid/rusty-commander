@@ -24,6 +24,8 @@
 
     /* === Interactive States === */
     --color-hover-bg: rgba(0, 120, 215, 0.1);
+    --color-selection-bg: #cce4f7;
+    --color-focus-border: #0078d4;
 
     /* === Semantic Colors === */
     --color-error: #d32f2f;
@@ -57,6 +59,8 @@
 
         /* === Interactive States === */
         --color-hover-bg: rgba(100, 180, 255, 0.15);
+        --color-selection-bg: #0a50d0;
+        --color-focus-border: #4da3ff;
 
         /* === Semantic Colors === */
         --color-error: #f44336;

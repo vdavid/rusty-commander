@@ -24,6 +24,20 @@ pub fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
         .map_err(|e| format!("Failed to read directory '{}': {}", path, e))
 }
 
+/// Checks if a path exists.
+///
+/// # Arguments
+/// * `path` - The path to check. Supports tilde expansion (~).
+///
+/// # Returns
+/// True if the path exists.
+#[tauri::command]
+pub fn path_exists(path: String) -> bool {
+    let expanded_path = expand_tilde(&path);
+    let path_buf = PathBuf::from(expanded_path);
+    path_buf.exists()
+}
+
 /// Expands tilde (~) to the user's home directory.
 fn expand_tilde(path: &str) -> String {
     if (path.starts_with("~/") || path == "~")

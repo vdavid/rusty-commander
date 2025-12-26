@@ -3,20 +3,71 @@
 
     interface Props {
         files: FileEntry[]
+        selectedIndex: number
+        onSelect: (index: number) => void
+        onNavigate: (entry: FileEntry) => void
     }
 
-    const { files }: Props = $props()
+    const { files, selectedIndex, onSelect, onNavigate }: Props = $props()
+
+    let listElement: HTMLUListElement | undefined = $state()
+
+    // Format display name: wrap directories in [...]
+    function formatName(entry: FileEntry): string {
+        if (entry.name === '..') {
+            return '[..]'
+        }
+        return entry.isDirectory ? `[${entry.name}]` : entry.name
+    }
+
+    function handleClick(index: number) {
+        onSelect(index)
+    }
+
+    function handleDoubleClick(index: number) {
+        onNavigate(files[index])
+    }
+
+    // Exported for parent to call when arrow keys change selection
+    export function scrollToIndex(index: number) {
+        if (!listElement) return
+        const items = listElement.querySelectorAll('.file-entry')
+        const item = items[index] as HTMLElement | undefined
+        if (item) {
+            item.scrollIntoView({ block: 'nearest' })
+        }
+    }
 </script>
 
-<ul class="file-list">
-    {#each files as file (file.path)}
-        <li class="file-entry" class:is-directory={file.isDirectory}>
+<ul
+    class="file-list"
+    bind:this={listElement}
+    tabindex="-1"
+    role="listbox"
+    aria-activedescendant={files[selectedIndex] ? `file-${String(selectedIndex)}` : undefined}
+>
+    {#each files as file, index (file.path)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <li
+            id={`file-${String(index)}`}
+            class="file-entry"
+            class:is-directory={file.isDirectory}
+            class:is-selected={index === selectedIndex}
+            onclick={() => {
+                handleClick(index)
+            }}
+            ondblclick={() => {
+                handleDoubleClick(index)
+            }}
+            role="option"
+            aria-selected={index === selectedIndex}
+        >
             {#if file.isDirectory}
                 <span class="icon">📁</span>
             {:else}
                 <span class="icon">📄</span>
             {/if}
-            <span class="name">{file.name}</span>
+            <span class="name">{formatName(file)}</span>
         </li>
     {/each}
 </ul>
@@ -29,19 +80,23 @@
         overflow-y: auto;
         font-family: var(--font-mono) monospace;
         font-size: var(--font-size-sm);
+        flex: 1;
+        outline: none;
     }
 
     .file-entry {
         padding: var(--spacing-xs) var(--spacing-sm);
-        cursor: pointer;
         display: flex;
         align-items: center;
         gap: var(--spacing-sm);
-        user-select: none;
     }
 
-    .file-entry:hover {
+    .file-entry:hover:not(.is-selected) {
         background-color: var(--color-hover-bg);
+    }
+
+    .file-entry.is-selected {
+        background-color: var(--color-selection-bg);
     }
 
     .icon {
