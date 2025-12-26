@@ -65,6 +65,12 @@ Only add JSDoc that actually adds info.
 - 4 spaces indentation
 - Cognitive complexity threshold: 15 (enforced by clippy)
 
+### CSS
+
+- Use `rem` for typography, `px` for everything else.
+- Use variables for colors, spacing, and the such, in `app.css`.
+- Always think about accessibility when designing, and dark+light modes.
+
 ## Git
 
 ### Commit messages
