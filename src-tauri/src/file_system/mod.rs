@@ -1,5 +1,6 @@
 //! File system module - operations, watchers, and providers.
 
+#[cfg(test)]
 mod mock_provider;
 mod operations;
 mod provider;

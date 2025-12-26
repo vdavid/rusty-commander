@@ -7,9 +7,16 @@ use std::fs;
 #[test]
 fn test_list_directory() {
     let provider = RealFileSystemProvider;
-    let temp_dir = std::env::temp_dir();
+    // Create our own temp directory to avoid permission issues
+    let temp_dir = std::env::temp_dir().join("rusty_commander_list_test");
+    fs::create_dir_all(&temp_dir).expect("Failed to create test directory");
+
     let result = provider.list_directory(&temp_dir);
-    assert!(result.is_ok());
+
+    // Cleanup
+    let _ = fs::remove_dir(&temp_dir);
+
+    assert!(result.is_ok(), "list_directory failed: {:?}", result.err());
 }
 
 #[test]

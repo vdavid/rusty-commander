@@ -5,7 +5,7 @@
 
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{Receiver, channel};
 
 /// Creates a new file system watcher that monitors the given path.
 ///

@@ -1,6 +1,6 @@
 //! Real file system provider implementation.
 
-use super::{operations, provider::FileSystemProvider, FileEntry};
+use super::{FileEntry, operations, provider::FileSystemProvider};
 use std::path::Path;
 
 /// Real file system provider that accesses the actual file system.
