@@ -173,6 +173,7 @@
                 bind:this={fileListRef}
                 {files}
                 {selectedIndex}
+                {isFocused}
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
             />

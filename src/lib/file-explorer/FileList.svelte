@@ -4,11 +4,12 @@
     interface Props {
         files: FileEntry[]
         selectedIndex: number
+        isFocused?: boolean
         onSelect: (index: number) => void
         onNavigate: (entry: FileEntry) => void
     }
 
-    const { files, selectedIndex, onSelect, onNavigate }: Props = $props()
+    const { files, selectedIndex, isFocused = true, onSelect, onNavigate }: Props = $props()
 
     let listElement: HTMLUListElement | undefined = $state()
 
@@ -37,6 +38,7 @@
 
 <ul
     class="file-list"
+    class:is-focused={isFocused}
     bind:this={listElement}
     tabindex="-1"
     role="listbox"
@@ -88,6 +90,10 @@
     }
 
     .file-entry.is-selected {
+        background-color: rgba(204, 228, 247, 0.1); /* 10% of selection color for inactive pane */
+    }
+
+    .file-list.is-focused .file-entry.is-selected {
         background-color: var(--color-selection-bg);
     }
 
@@ -104,5 +110,12 @@
 
     .is-directory .name {
         font-weight: 600;
+    }
+
+    /* Dark mode: 10% of dark selection color #0a50d0 */
+    @media (prefers-color-scheme: dark) {
+        .file-entry.is-selected {
+            background-color: rgba(10, 80, 208, 0.1);
+        }
     }
 </style>
