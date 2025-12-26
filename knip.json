@@ -1,0 +1,6 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "ignore": [],
+    "ignoreDependencies": ["@tauri-apps/plugin-window-state", "@testing-library/svelte"],
+    "ignoreExportsUsedInFile": true
+}

@@ -86,6 +86,25 @@ func (c *SvelteCheck) Run(ctx *CheckContext) error {
 	return nil
 }
 
+// KnipCheck finds unused code, dependencies, and exports.
+type KnipCheck struct{}
+
+func (c *KnipCheck) Name() string {
+	return "knip"
+}
+
+func (c *KnipCheck) Run(ctx *CheckContext) error {
+	cmd := exec.Command("pnpm", "knip")
+	cmd.Dir = ctx.RootDir
+	output, err := runCommand(cmd, true)
+	if err != nil {
+		fmt.Println()
+		fmt.Print(indentOutput(output, "      "))
+		return fmt.Errorf("knip found unused code or dependencies")
+	}
+	return nil
+}
+
 // SvelteTestsCheck runs Svelte unit tests with Vitest.
 type SvelteTestsCheck struct{}
 

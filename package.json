@@ -16,7 +16,8 @@
         "format:check": "prettier --check .",
         "test": "vitest run",
         "test:watch": "vitest",
-        "test:e2e": "playwright test"
+        "test:e2e": "playwright test",
+        "knip": "knip"
     },
     "license": "MIT",
     "dependencies": {
@@ -41,6 +42,7 @@
         "eslint-plugin-svelte": "^3.13.1",
         "globals": "^16.5.0",
         "jsdom": "^27.3.0",
+        "knip": "^5.77.1",
         "prettier": "^3.7.4",
         "prettier-plugin-svelte": "^3.4.1",
         "svelte": "^5.46.1",

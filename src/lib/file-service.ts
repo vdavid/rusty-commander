@@ -14,7 +14,7 @@ export interface FileService {
 /**
  * Real file service that uses Tauri commands.
  */
-export class TauriFileService implements FileService {
+class TauriFileService implements FileService {
     listDirectory(path: string): Promise<FileEntry[]> {
         return tauriListDirectory(path)
     }

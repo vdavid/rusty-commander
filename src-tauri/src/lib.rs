@@ -1,3 +1,6 @@
+// Warn on unused dependencies to catch platform-specific cfg mismatches
+#![warn(unused_crate_dependencies)]
+
 mod commands;
 mod file_system;
 
@@ -9,8 +12,13 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+    let builder = tauri::Builder::default();
+
+    // Window state plugin is only available on desktop platforms
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::new().build());
+
+    builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
