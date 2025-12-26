@@ -91,10 +91,6 @@
         gap: var(--spacing-sm);
     }
 
-    .file-entry:hover:not(.is-selected) {
-        background-color: var(--color-hover-bg);
-    }
-
     .file-entry.is-selected {
         background-color: var(--color-selection-bg);
     }
