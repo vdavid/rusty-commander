@@ -1,0 +1,30 @@
+# cargo-nextest configuration
+# See https://nexte.st/docs/configuration/ for full documentation
+
+[profile.default]
+# Show test output for failing tests only
+failure-output = "immediate"
+# Show test output for successful tests
+success-output = "never"
+# Number of retries for failing tests (useful for flaky tests)
+retries = 0
+# Run tests with all available threads
+test-threads = "num-cpus"
+# Fail fast - stop on first failure
+fail-fast = false
+# Show the slowest tests
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+[profile.ci]
+# Inherit from default profile
+inherits = "default"
+# In CI, show output for both passing and failing tests
+success-output = "immediate-final"
+# In CI, fail fast to save time
+fail-fast = true
+# JUnit report for CI integration
+[profile.ci.junit]
+path = "target/nextest/ci/junit.xml"
+
+[profile.default.junit]
+path = "target/nextest/default/junit.xml"
