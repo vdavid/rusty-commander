@@ -22,6 +22,8 @@ func getCheckByName(name string) Check {
 		return &PrettierCheck{}
 	case "eslint":
 		return &ESLintCheck{}
+	case "svelte-check":
+		return &SvelteCheck{}
 	case "svelte-tests":
 		return &SvelteTestsCheck{}
 	case "e2e-tests":
@@ -63,6 +65,7 @@ func getSvelteChecks() []Check {
 	return []Check{
 		&PrettierCheck{},
 		&ESLintCheck{},
+		&SvelteCheck{},
 		&SvelteTestsCheck{},
 		&E2ETestsCheck{},
 	}

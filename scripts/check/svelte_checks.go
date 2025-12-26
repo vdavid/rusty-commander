@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // PrettierCheck formats code with Prettier.
@@ -55,6 +56,32 @@ func (c *ESLintCheck) Run(ctx *CheckContext) error {
 			return fmt.Errorf("lint errors found, run pnpm lint:fix locally")
 		}
 		return fmt.Errorf("eslint found unfixable errors")
+	}
+	return nil
+}
+
+// SvelteCheck runs svelte-check for type and a11y validation.
+type SvelteCheck struct{}
+
+func (c *SvelteCheck) Name() string {
+	return "svelte-check"
+}
+
+func (c *SvelteCheck) Run(ctx *CheckContext) error {
+	cmd := exec.Command("pnpm", "check")
+	cmd.Dir = ctx.RootDir
+	output, err := runCommand(cmd, true)
+	// svelte-check returns 0 even with warnings, so check output for warnings
+	if err != nil {
+		fmt.Println()
+		fmt.Print(indentOutput(output, "      "))
+		return fmt.Errorf("svelte-check failed")
+	}
+	// Check for warnings in output (svelte-check reports "X warnings")
+	if strings.Contains(output, " warning") && !strings.Contains(output, "0 warnings") {
+		fmt.Println()
+		fmt.Print(indentOutput(output, "      "))
+		return fmt.Errorf("svelte-check found warnings")
 	}
 	return nil
 }
