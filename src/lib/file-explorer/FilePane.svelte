@@ -49,6 +49,11 @@
             name: '..',
             path: parentPath,
             isDirectory: true,
+            isSymlink: false,
+            permissions: 0o755,
+            owner: '',
+            group: '',
+            iconId: 'dir',
         }
     }
 

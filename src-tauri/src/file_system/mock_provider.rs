@@ -19,12 +19,26 @@ impl MockFileSystemProvider {
     /// Useful for stress testing with large file counts.
     pub fn with_file_count(count: usize) -> Self {
         let entries = (0..count)
-            .map(|i| FileEntry {
-                name: format!("file_{:06}.txt", i),
-                path: format!("/mock/file_{:06}.txt", i),
-                is_directory: i % 10 == 0, // Every 10th entry is a directory
-                size: Some(1024 * (i as u64)),
-                modified_at: Some(1640000000 + i as u64),
+            .map(|i| {
+                let is_dir = i % 10 == 0;
+                let name = format!("file_{:06}.txt", i);
+                FileEntry {
+                    name: name.clone(),
+                    path: format!("/mock/file_{:06}.txt", i),
+                    is_directory: is_dir,
+                    is_symlink: i % 50 == 0, // Every 50th is a symlink for testing
+                    size: Some(1024 * (i as u64)),
+                    modified_at: Some(1640000000 + i as u64),
+                    created_at: Some(1639000000 + i as u64),
+                    permissions: 0o644,
+                    owner: "testuser".to_string(),
+                    group: "staff".to_string(),
+                    icon_id: if is_dir {
+                        "dir".to_string()
+                    } else {
+                        "ext:txt".to_string()
+                    },
+                }
             })
             .collect();
         Self::new(entries)

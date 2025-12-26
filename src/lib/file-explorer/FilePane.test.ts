@@ -4,6 +4,7 @@ import { tick } from 'svelte'
 import FilePane from './FilePane.svelte'
 import { MockFileService } from '$lib/file-service'
 import type { FileEntry } from './types'
+import { createFileEntry } from './test-helpers'
 
 describe('FilePane', () => {
     let mockService: MockFileService
@@ -12,16 +13,16 @@ describe('FilePane', () => {
     beforeEach(() => {
         mockService = new MockFileService()
         mockFiles = [
-            {
+            createFileEntry({
                 name: 'Documents',
                 path: '/home/user/Documents',
                 isDirectory: true,
-            },
-            {
+            }),
+            createFileEntry({
                 name: 'file.txt',
                 path: '/home/user/file.txt',
                 isDirectory: false,
-            },
+            }),
         ]
     })
 
@@ -88,9 +89,9 @@ describe('FilePane', () => {
 
     it('hides hidden files when showHiddenFiles is false', async () => {
         const filesWithHidden: FileEntry[] = [
-            { name: '.hidden', path: '/test/.hidden', isDirectory: false },
-            { name: '.config', path: '/test/.config', isDirectory: true },
-            { name: 'visible.txt', path: '/test/visible.txt', isDirectory: false },
+            createFileEntry({ name: '.hidden', path: '/test/.hidden', isDirectory: false }),
+            createFileEntry({ name: '.config', path: '/test/.config', isDirectory: true }),
+            createFileEntry({ name: 'visible.txt', path: '/test/visible.txt', isDirectory: false }),
         ]
         mockService.setMockData('/test', filesWithHidden)
         const target = document.createElement('div')
@@ -109,8 +110,8 @@ describe('FilePane', () => {
 
     it('shows hidden files when showHiddenFiles is true', async () => {
         const filesWithHidden: FileEntry[] = [
-            { name: '.hidden', path: '/test/.hidden', isDirectory: false },
-            { name: 'visible.txt', path: '/test/visible.txt', isDirectory: false },
+            createFileEntry({ name: '.hidden', path: '/test/.hidden', isDirectory: false }),
+            createFileEntry({ name: 'visible.txt', path: '/test/visible.txt', isDirectory: false }),
         ]
         mockService.setMockData('/test', filesWithHidden)
         const target = document.createElement('div')
@@ -127,7 +128,9 @@ describe('FilePane', () => {
     })
 
     it('always shows .. entry even when showHiddenFiles is false', async () => {
-        const filesWithHidden: FileEntry[] = [{ name: '.hidden', path: '/test/.hidden', isDirectory: false }]
+        const filesWithHidden: FileEntry[] = [
+            createFileEntry({ name: '.hidden', path: '/test/.hidden', isDirectory: false }),
+        ]
         mockService.setMockData('/test', filesWithHidden)
         const target = document.createElement('div')
         mount(FilePane, {

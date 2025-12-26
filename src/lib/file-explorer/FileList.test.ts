@@ -2,22 +2,23 @@ import { describe, it, expect, vi } from 'vitest'
 import { mount } from 'svelte'
 import FileList from './FileList.svelte'
 import type { FileEntry } from './types'
+import { createFileEntry } from './test-helpers'
 
 describe('FileList', () => {
     const noop = () => {}
 
     it('renders file entries', () => {
         const files: FileEntry[] = [
-            {
+            createFileEntry({
                 name: 'Documents',
                 path: '/home/user/Documents',
                 isDirectory: true,
-            },
-            {
+            }),
+            createFileEntry({
                 name: 'file.txt',
                 path: '/home/user/file.txt',
                 isDirectory: false,
-            },
+            }),
         ]
 
         const target = document.createElement('div')
@@ -32,16 +33,16 @@ describe('FileList', () => {
 
     it('distinguishes directories from files', () => {
         const files: FileEntry[] = [
-            {
+            createFileEntry({
                 name: 'Documents',
                 path: '/home/user/Documents',
                 isDirectory: true,
-            },
-            {
+            }),
+            createFileEntry({
                 name: 'file.txt',
                 path: '/home/user/file.txt',
                 isDirectory: false,
-            },
+            }),
         ]
 
         const target = document.createElement('div')
@@ -68,11 +69,11 @@ describe('FileList', () => {
 
     it('displays icons for files and directories', () => {
         const files: FileEntry[] = [
-            {
+            createFileEntry({
                 name: 'Documents',
                 path: '/home/user/Documents',
                 isDirectory: true,
-            },
+            }),
         ]
 
         const target = document.createElement('div')
@@ -87,8 +88,8 @@ describe('FileList', () => {
 
     it('shows selected state on correct item', () => {
         const files: FileEntry[] = [
-            { name: 'a', path: '/a', isDirectory: false },
-            { name: 'b', path: '/b', isDirectory: false },
+            createFileEntry({ name: 'a', path: '/a', isDirectory: false }),
+            createFileEntry({ name: 'b', path: '/b', isDirectory: false }),
         ]
 
         const target = document.createElement('div')
@@ -103,7 +104,7 @@ describe('FileList', () => {
     })
 
     it('formats parent directory as ..', () => {
-        const files: FileEntry[] = [{ name: '..', path: '/home', isDirectory: true }]
+        const files: FileEntry[] = [createFileEntry({ name: '..', path: '/home', isDirectory: true })]
 
         const target = document.createElement('div')
         mount(FileList, {
@@ -115,7 +116,7 @@ describe('FileList', () => {
     })
 
     it('calls onSelect when item is clicked', () => {
-        const files: FileEntry[] = [{ name: 'test', path: '/test', isDirectory: false }]
+        const files: FileEntry[] = [createFileEntry({ name: 'test', path: '/test', isDirectory: false })]
         const onSelect = vi.fn()
 
         const target = document.createElement('div')
