@@ -25,4 +25,7 @@ serde = { version = "1", features = ["derive"] }
 notify = "8"
 dirs = "6"
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-window-state = "2"
+
 
