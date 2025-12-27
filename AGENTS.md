@@ -95,6 +95,18 @@ See [docs/adr](docs/adr) for all key technical decisions, and the
   [ADR-005](docs/adr/005-scoped-css-for-file-explorer.md)
 - **Clippy `--allow-dirty --allow-staged`** is used locally to allow auto-fixes even with uncommitted changes
 
+## MCP
+
+There should be an MCP server available to access Tauri. If it isn't, and you need it, ask the user for it! (There are
+guidelines to add it in [CONTRIBUTING.md](CONTRIBUTING.md).) Run the app in dev mode, then use the MCP server to take
+screenshots, click buttons, read front-end logs, and the such.
+
+## Security warnings
+
+- When adding new code that loads remote content (like `fetch` from external URLs or `iframe`), always add a condition
+  to **disable** that functionality in dev mode, and use static/mock data instead. See
+  [security docs](docs/security.md#withglobaltauri) for more reasoning.
+
 ## Useful references
 
 - Tauri docs: https://tauri.app/v2/

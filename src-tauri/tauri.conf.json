@@ -10,6 +10,7 @@
         "frontendDist": "../build"
     },
     "app": {
+            "withGlobalTauri": false,
         "windows": [
             {
                 "title": "Rusty Commander",

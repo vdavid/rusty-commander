@@ -78,6 +78,23 @@ export default tseslint.config(
         },
     },
     {
+        // Node.js scripts (like tauri-wrapper.js) need Node globals
+        files: ['scripts/*.js'],
+        plugins: {
+            prettier,
+        },
+        languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+            globals: {
+                ...globals.node,
+            },
+        },
+        rules: {
+            'prettier/prettier': 'error',
+        },
+    },
+    {
         files: ['vite.config.js', 'vitest.config.ts', 'playwright.config.ts'],
         plugins: {
             prettier,

@@ -49,4 +49,36 @@ pnpm tauri build
 
 This creates a production build for your current platform in `src-tauri/target/release/`.
 
+## Agent integration (MCP)
+
+The app uses [MCP Server Tauri](https://github.com/hypothesi/mcp-server-tauri) to let AI assistants (Claude Code,
+Cursor, etc.) control this app: take screenshots, click buttons, read front-end logs, etc. It's quite helpful.
+
+### Setting up your AI assistant
+
+For `claude-code`, `cursor`, `vscode`, or `windsurf`, there is autoconfig available. Run this command in your terminal
+for your specific client: `npx -y install-mcp @hypothesi/tauri-mcp-server --client <your-client>`.
+([source](https://github.com/hypothesi/mcp-server-tauri)).
+
+If the automated setup doesn't work for you, check the MCP documentation for your specific client. For example:
+
+- [Claude Desktop](https://docs.anthropic.com/en/docs/agents-and-tools/mcp)
+- [Cursor](https://docs.cursor.com/context/model-context-protocol)
+- [Antigravity](https://medium.com/google-developer-experts/google-antigravity-custom-mcp-server-integration-to-improve-vibe-coding-f92ddbc1c22d)
+
+This snippet will likely come handy:
+
+```json
+{
+    "mcpServers": {
+        "tauri": {
+            "command": "npx",
+            "args": ["-y", "@hypothesi/tauri-mcp-server"]
+        }
+    }
+}
+```
+
+Since the agent shares the context with your IDE/client, enabling the MCP server makes the tools available to the agent automatically.
+
 Happy coding!
