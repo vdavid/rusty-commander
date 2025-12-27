@@ -7,9 +7,16 @@ import type { FileEntry } from './types'
 import { createFileEntry } from './test-helpers'
 
 // Mock icon-cache to avoid Tauri dependency
+// Use a manual mock store instead of importing writable
 vi.mock('$lib/icon-cache', () => ({
     getCachedIcon: vi.fn().mockReturnValue(undefined),
     prefetchIcons: vi.fn().mockResolvedValue(undefined),
+    iconCacheVersion: {
+        subscribe: vi.fn((fn: (value: number) => void) => {
+            fn(0)
+            return () => {}
+        }),
+    },
 }))
 
 describe('FilePane', () => {

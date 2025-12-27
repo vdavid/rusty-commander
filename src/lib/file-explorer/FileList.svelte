@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { FileEntry } from './types'
-    import { getCachedIcon, prefetchIcons } from '$lib/icon-cache'
+    import { getCachedIcon, prefetchIcons, iconCacheVersion } from '$lib/icon-cache'
 
     interface Props {
         files: FileEntry[]
@@ -29,7 +29,14 @@
         }
     })
 
+    // Subscribe to cache version - this makes getIconUrl reactive
+    // When iconCacheVersion updates, this derived value triggers re-render
+
+    const _cacheVersion = $derived($iconCacheVersion)
+
     function getIconUrl(file: FileEntry): string | undefined {
+        // Read _cacheVersion to establish reactive dependency (it's used implicitly)
+        void _cacheVersion
         return getCachedIcon(file.iconId)
     }
 
@@ -86,11 +93,16 @@
             role="option"
             aria-selected={index === selectedIndex}
         >
-            {#if getIconUrl(file)}
-                <img class="icon" src={getIconUrl(file)} alt="" width="16" height="16" />
-            {:else}
-                <span class="icon-emoji">{getFallbackEmoji(file)}</span>
-            {/if}
+            <span class="icon-wrapper">
+                {#if getIconUrl(file)}
+                    <img class="icon" src={getIconUrl(file)} alt="" width="16" height="16" />
+                {:else}
+                    <span class="icon-emoji">{getFallbackEmoji(file)}</span>
+                {/if}
+                {#if file.isSymlink}
+                    <span class="symlink-badge">🔗</span>
+                {/if}
+            </span>
             <span class="name">{formatName(file)}</span>
         </li>
     {/each}
@@ -123,18 +135,32 @@
         background-color: var(--color-selection-bg);
     }
 
-    .icon {
+    .icon-wrapper {
+        position: relative;
         width: 16px;
         height: 16px;
         flex-shrink: 0;
+    }
+
+    .icon {
+        width: 16px;
+        height: 16px;
         object-fit: contain;
     }
 
     .icon-emoji {
         font-size: var(--font-size-sm);
-        flex-shrink: 0;
         width: 16px;
         text-align: center;
+        display: block;
+    }
+
+    .symlink-badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        font-size: 8px;
+        line-height: 1;
     }
 
     .name {

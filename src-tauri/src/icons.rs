@@ -85,23 +85,30 @@ pub fn generate_icon_id(is_dir: bool, is_symlink: bool, extension: Option<&str>)
 }
 
 /// Gets the sample file path to use for fetching an icon by ID.
-/// For extension-based icons, we create a temp file with that extension.
+/// For extension-based icons, we create an actual temp file since the OS may need it to exist.
 fn get_sample_path_for_icon_id(icon_id: &str) -> Option<std::path::PathBuf> {
     if icon_id == "dir" {
         // Use home directory as sample directory
         return dirs::home_dir();
     }
     if icon_id == "symlink" {
-        // Symlinks use a generic file icon
-        return Some(std::path::PathBuf::from("/tmp"));
+        // For symlinks, use a generic file icon (not a directory!)
+        // Use /etc/hosts which exists on all macOS systems
+        return Some(std::path::PathBuf::from("/etc/hosts"));
     }
     if icon_id == "file" {
-        // Generic file with no extension
-        return Some(std::path::PathBuf::from("/tmp/file"));
+        // Generic file with no extension - use /etc/hosts
+        return Some(std::path::PathBuf::from("/etc/hosts"));
     }
     if let Some(ext) = icon_id.strip_prefix("ext:") {
-        // Create a fake path with the extension to get the right icon
-        return Some(std::path::PathBuf::from(format!("/tmp/sample.{}", ext)));
+        // Create an actual temp file with the extension
+        // macOS Launch Services needs the file to exist to get the correct icon
+        let temp_path = std::env::temp_dir().join(format!("rusty_commander_icon_sample.{}", ext));
+        // Create the file if it doesn't exist (empty file is fine)
+        if !temp_path.exists() {
+            let _ = std::fs::File::create(&temp_path);
+        }
+        return Some(temp_path);
     }
     None
 }
