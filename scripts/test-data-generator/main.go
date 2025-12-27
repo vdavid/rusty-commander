@@ -284,7 +284,8 @@ func createIconTestData(baseDir string) error {
 
 		// Create a readme inside the folder
 		readmePath := filepath.Join(folderPath, "README.md")
-		readmeContent := fmt.Sprintf("# %s Folder\n\nThis folder has a custom %s circle icon.\n", strings.Title(color), color)
+		colorTitle := strings.ToUpper(color[:1]) + color[1:]
+		readmeContent := fmt.Sprintf("# %s folder\n\nThis folder has a custom %s circle icon.\n", colorTitle, color)
 		if err := os.WriteFile(readmePath, []byte(readmeContent), 0644); err != nil {
 			return fmt.Errorf("failed to create README in %s: %w", folderName, err)
 		}
@@ -301,7 +302,7 @@ func createIconTestData(baseDir string) error {
 	}
 
 	// Add README to regular folder (already created earlier as symlink target)
-	if err := os.WriteFile(filepath.Join(regularFolder, "README.md"), []byte("# Regular Folder\n\nThis folder has the default macOS folder icon.\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(regularFolder, "README.md"), []byte("# Regular folder\n\nThis folder has the default macOS folder icon.\n"), 0644); err != nil {
 		return fmt.Errorf("failed to create README in regular folder: %w", err)
 	}
 
