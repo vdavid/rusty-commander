@@ -328,10 +328,6 @@
         border: 1px solid var(--color-border-primary);
     }
 
-    .file-pane.is-focused {
-        border-color: var(--color-focus-border);
-    }
-
     .header {
         padding: var(--spacing-sm);
         background-color: var(--color-bg-secondary);
