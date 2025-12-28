@@ -11,7 +11,7 @@
 - [x] Add navigation feature (go in dir, go up one dir)
 - [x] Add chunked loading for big folders or slow drives for fast first byte experience
 - [x] Improve performance
-- [ ] Display file info below each panel for the file under the cursor
+- [x] Display file info below each panel for the file under the cursor
 - [ ] Add file watching to auto-update changes. It should be as close to immediate as possible
 - [ ] Add full/brief view
 - [ ] Make sure it lists Dropbox files correctly, incl. files that are loaded on the fly

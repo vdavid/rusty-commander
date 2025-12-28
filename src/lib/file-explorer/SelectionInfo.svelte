@@ -250,23 +250,28 @@
         font-size: calc(var(--font-size-sm) * 0.9);
     }
 
-    /* Size tier colors - bytes are default text color */
+    /* Size tier colors - bytes are default text color - these are used dynamically */
+    /*noinspection CssUnusedSymbol*/
     .size-bytes {
         color: var(--color-text-secondary);
     }
 
+    /*noinspection CssUnusedSymbol*/
     .size-kb {
         color: var(--color-size-kb);
     }
 
+    /*noinspection CssUnusedSymbol*/
     .size-mb {
         color: var(--color-size-mb);
     }
 
+    /*noinspection CssUnusedSymbol*/
     .size-gb {
         color: var(--color-size-gb);
     }
 
+    /*noinspection CssUnusedSymbol*/
     .size-tb {
         color: var(--color-size-tb);
     }
