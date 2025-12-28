@@ -13,12 +13,33 @@ vi.mock('$lib/app-status-store', () => ({
     saveAppStatus: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@tauri-apps/api/event', () => ({
+    listen: vi.fn(() => Promise.resolve(() => {})),
+}))
+
+vi.mock('@tauri-apps/api/core', () => ({
+    invoke: vi.fn(),
+}))
+
 // Mock pathExists
 vi.mock('$lib/tauri-commands', () => ({
     pathExists: vi.fn().mockResolvedValue(true),
-    listDirectoryContents: vi.fn().mockResolvedValue([]),
+    listDirectoryStartSession: vi.fn().mockResolvedValue({
+        sessionId: 'mock-session-id',
+        totalCount: 0,
+        entries: [],
+        hasMore: false,
+    }),
+    listDirectoryNextChunk: vi.fn().mockResolvedValue({
+        entries: [],
+        hasMore: false,
+    }),
+    listDirectoryEndSession: vi.fn().mockResolvedValue(undefined),
     openFile: vi.fn().mockResolvedValue(undefined),
     getIcons: vi.fn().mockResolvedValue({}),
+    listen: vi.fn(() => Promise.resolve(() => {})),
+    showFileContextMenu: vi.fn(() => Promise.resolve()),
+    updateMenuContext: vi.fn(() => Promise.resolve()),
 }))
 
 // Mock settings-store to avoid Tauri event API dependency in tests

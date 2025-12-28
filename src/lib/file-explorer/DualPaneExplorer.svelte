@@ -55,7 +55,8 @@
         }
 
         // Forward arrow keys and Enter to the focused pane
-        const activePaneRef = focusedPane === 'left' ? leftPaneRef : rightPaneRef
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript thinks FilePane.handleKeyDown is unused without this
+        const activePaneRef = (focusedPane === 'left' ? leftPaneRef : rightPaneRef) as FilePane | undefined
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         activePaneRef?.handleKeyDown(e)
     }

@@ -2,7 +2,11 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { openPath } from '@tauri-apps/plugin-opener'
+import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event'
 import type { ChunkNextResult, SessionStartResult } from './file-explorer/types'
+
+export type { Event, UnlistenFn }
+export { listen }
 
 // ============================================================================
 // Cursor-based pagination API (session-based)
@@ -76,4 +80,22 @@ export async function refreshDirectoryIcons(
         directoryPaths,
         extensions,
     })
+}
+/**
+ * Shows a native context menu for a file.
+ * @param path - Absolute path to the file.
+ * @param filename - Name of the file.
+ * @param isDirectory - Whether the entry is a directory.
+ */
+export async function showFileContextMenu(path: string, filename: string, isDirectory: boolean): Promise<void> {
+    await invoke('show_file_context_menu', { path, filename, isDirectory })
+}
+
+/**
+ * Updates the global menu context (used by app-level File menu).
+ * @param path - Absolute path to the file.
+ * @param filename - Name of the file.
+ */
+export async function updateMenuContext(path: string, filename: string): Promise<void> {
+    await invoke('update_menu_context', { path, filename })
 }

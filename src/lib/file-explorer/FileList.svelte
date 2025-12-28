@@ -8,9 +8,10 @@
         isFocused?: boolean
         onSelect: (index: number) => void
         onNavigate: (entry: FileEntry) => void
+        onContextMenu?: (entry: FileEntry) => void
     }
 
-    const { files, selectedIndex, isFocused = true, onSelect, onNavigate }: Props = $props()
+    const { files, selectedIndex, isFocused = true, onSelect, onNavigate, onContextMenu }: Props = $props()
 
     let listElement: HTMLUListElement | undefined = $state()
 
@@ -97,6 +98,11 @@
             }}
             ondblclick={() => {
                 handleDoubleClick(index)
+            }}
+            oncontextmenu={(e) => {
+                e.preventDefault()
+                onSelect(index)
+                onContextMenu?.(files[index])
             }}
             role="option"
             aria-selected={index === selectedIndex}

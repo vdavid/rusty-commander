@@ -1,7 +1,16 @@
 <script lang="ts">
     import { onMount, tick, untrack } from 'svelte'
     import type { FileEntry } from './types'
-    import { openFile } from '$lib/tauri-commands'
+    import {
+        listen,
+        openFile,
+        showFileContextMenu,
+        updateMenuContext,
+        listDirectoryStartSession,
+        listDirectoryNextChunk,
+        listDirectoryEndSession,
+        type UnlistenFn,
+    } from '$lib/tauri-commands'
     import FileList from './FileList.svelte'
     import SelectionInfo from './SelectionInfo.svelte'
 
@@ -52,7 +61,7 @@
     })
 
     // Currently selected entry for SelectionInfo (must be after files declaration)
-    const selectedEntry = $derived(files[selectedIndex] ?? null)
+    const selectedEntry = $derived(files[selectedIndex])
 
     // Create ".." entry for parent navigation
     function createParentEntry(path: string): FileEntry | null {
@@ -82,10 +91,6 @@
         totalCount = 0
 
         try {
-            // Import session API functions
-            const { listDirectoryStartSession, listDirectoryNextChunk, listDirectoryEndSession } =
-                await import('$lib/tauri-commands')
-
             // Start session - reads directory ONCE, returns first chunk immediately
             const startResult = await listDirectoryStartSession(path, CHUNK_SIZE)
 
@@ -222,6 +227,11 @@
         onRequestFocus?.()
     }
 
+    async function handleContextMenu(entry: FileEntry) {
+        if (entry.name === '..') return // No context menu for parent entry
+        await showFileContextMenu(entry.path, entry.name, entry.isDirectory)
+    }
+
     async function handleNavigate(entry: FileEntry) {
         if (entry.isDirectory) {
             // When navigating to parent (..), remember current folder name to select it
@@ -281,6 +291,16 @@
         }
     })
 
+    // Update global menu context when selection or focus changes
+    $effect(() => {
+        if (!isFocused) return
+
+        const entry = files[selectedIndex] as FileEntry | undefined
+        if (entry && entry.name !== '..') {
+            void updateMenuContext(entry.path, entry.name)
+        }
+    })
+
     // Reset selection when showHiddenFiles changes and current selection becomes invalid
     $effect(() => {
         // Re-run when files change (which depends on showHiddenFiles)
@@ -293,6 +313,28 @@
 
     onMount(() => {
         void loadDirectory(currentPath)
+
+        let unlistenCleanup: UnlistenFn | undefined
+
+        // Listen for menu actions from Rust
+        void (async () => {
+            unlistenCleanup = await listen<{ action: string; path: string }>('menu-action', (event) => {
+                if (isFocused && event.payload.action === 'get-info') {
+                    if (selectedEntry.path === event.payload.path) {
+                        // Show info in a simple way for now
+                        const size = selectedEntry.size !== undefined ? selectedEntry.size.toString() : 'N/A'
+                        const perms = selectedEntry.permissions.toString(8)
+                        alert(
+                            `Get info for: ${selectedEntry.name}\nPath: ${selectedEntry.path}\nSize: ${size} bytes\nOwner: ${selectedEntry.owner}\nPermissions: ${perms}`,
+                        )
+                    }
+                }
+            })
+        })()
+
+        return () => {
+            if (unlistenCleanup) unlistenCleanup()
+        }
     })
 </script>
 
@@ -321,6 +363,7 @@
                 {isFocused}
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
+                onContextMenu={handleContextMenu}
             />
             {#if loadingMore}
                 <div class="loading-more">

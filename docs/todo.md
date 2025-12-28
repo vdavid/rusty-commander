@@ -12,8 +12,11 @@
 - [x] Add chunked loading for big folders or slow drives for fast first byte experience
 - [x] Improve performance
 - [x] Display file info below each panel for the file under the cursor
+- [x] Add context menu for files and folders
 - [ ] Add file watching to auto-update changes. It should be as close to immediate as possible
-- [ ] Add full/brief view
+- [ ] Implement proper Full view (with fixed columns)
+- [ ] Add Brief view with view switching option
+- [ ] Add different sorting options
 - [ ] Make sure it lists Dropbox files correctly, incl. files that are loaded on the fly
 - [ ] When sorting alphabetically, sort numbers ascending, not alphabetically
 - [ ] Add "change drive" feature
@@ -32,3 +35,17 @@
 
 - [ ] Add file selection feature
 - [ ] Add copy, move, delete functionality
+- Add these to the context menu:
+    - 🟢 Easy Rename 2 Text input + fs.rename() calls already exist
+    - 🟢 Easy New Folder 2 Already have F7 likely, just wire to menu
+    - 🟡 Medium Delete permanently 3 Need confirmation dialog, already have delete logic?
+    - 🟡 Medium Edit (F4) 4 Open in default editor via shell.open()
+    - 🟡 Medium Duplicate 4 Copy + rename with "(copy)" suffix
+    - 🟡 Medium Make Symlink 5 std::os::unix::fs::symlink - straightforward
+    - 🟠 Hard Compress selected file(s) 6 Need to call zip or use a Rust crate
+    - 🟠 Hard Color tags (macOS) 7 Requires extended attributes - xattr crate
+    - 🟠 Hard Tags... dialog 7 UI for managing tags + xattr integration
+
+## File viewer
+
+- Add "View" to File menu and context menu

@@ -9,6 +9,7 @@
         "core:default",
         "opener:default",
         "store:default",
+        "clipboard-manager:default",
         "mcp-bridge:default"
     ]
 }

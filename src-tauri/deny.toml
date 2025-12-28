@@ -23,8 +23,9 @@ allow = [
     "MPL-2.0",
     "Unicode-3.0",
     "CC0-1.0",
-    "NCSA",  # For libfuzzer-sys (transitive dependency of image crate)
     "AGPL-3.0-or-later",
+    "NCSA",     # For libfuzzer-sys (transitive dependency of image crate)
+    "BSL-1.0",  # For clipboard-win (transitive dependency of tauri-plugin-clipboard-manager)
 ]
 
 [bans]

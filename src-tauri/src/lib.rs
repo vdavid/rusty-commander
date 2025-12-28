@@ -41,6 +41,7 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             // Load persisted settings to initialize menu with correct state
             let saved_settings = settings::load_settings(app.handle());
@@ -57,7 +58,8 @@ pub fn run() {
             Ok(())
         })
         .on_menu_event(|app, event| {
-            if event.id().as_ref() == SHOW_HIDDEN_FILES_ID {
+            let id = event.id().as_ref();
+            if id == SHOW_HIDDEN_FILES_ID {
                 // Get the CheckMenuItem from app state
                 let menu_state = app.state::<MenuState<tauri::Wry>>();
                 let guard = menu_state.show_hidden_files.lock().unwrap();
@@ -71,6 +73,9 @@ pub fn run() {
 
                 // Emit event to frontend with the new state
                 let _ = app.emit("settings-changed", serde_json::json!({ "showHiddenFiles": new_state }));
+            } else {
+                // Handle file actions
+                commands::ui::execute_menu_action(app, id);
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -80,7 +85,9 @@ pub fn run() {
             commands::file_system::list_directory_end_session,
             commands::file_system::path_exists,
             commands::icons::get_icons,
-            commands::icons::refresh_directory_icons
+            commands::icons::refresh_directory_icons,
+            commands::ui::show_file_context_menu,
+            commands::ui::update_menu_context
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

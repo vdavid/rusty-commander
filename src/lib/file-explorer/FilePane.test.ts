@@ -4,6 +4,14 @@ import FilePane from './FilePane.svelte'
 import type { FileEntry } from './types'
 import { createFileEntry } from './test-helpers'
 
+vi.mock('@tauri-apps/api/event', () => ({
+    listen: vi.fn(() => Promise.resolve(() => {})),
+}))
+
+vi.mock('@tauri-apps/api/core', () => ({
+    invoke: vi.fn(),
+}))
+
 // Mock icon-cache to avoid Tauri dependency
 vi.mock('$lib/icon-cache', () => ({
     getCachedIcon: vi.fn().mockReturnValue(undefined),
@@ -49,6 +57,9 @@ vi.mock('$lib/tauri-commands', () => ({
     ),
     listDirectoryEndSession: vi.fn(() => Promise.resolve()),
     openFile: vi.fn(() => Promise.resolve()),
+    listen: vi.fn(() => Promise.resolve(() => {})),
+    showFileContextMenu: vi.fn(() => Promise.resolve()),
+    updateMenuContext: vi.fn(() => Promise.resolve()),
 }))
 
 describe('FilePane', () => {
