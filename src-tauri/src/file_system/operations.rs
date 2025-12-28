@@ -9,9 +9,10 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::sync::LazyLock;
 use std::sync::RwLock;
-use std::time::Instant;
 use uuid::Uuid;
 use uzers::{get_group_by_gid, get_user_by_uid};
+
+use super::watcher::{start_watching, stop_watching};
 
 /// Cache for uid→username and gid→groupname resolution.
 static OWNER_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -24,9 +25,10 @@ static SESSION_CACHE: LazyLock<RwLock<HashMap<String, CachedDirectory>>> =
 
 /// Cached directory entries for cursor-based pagination.
 struct CachedDirectory {
+    path: std::path::PathBuf,
     entries: Vec<FileEntry>,
     cursor: usize,
-    created_at: Instant,
+    // No created_at - sessions are eternal until explicitly ended
 }
 
 /// Resolves a uid to a username, with caching.
@@ -303,19 +305,23 @@ pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionSta
     let first_chunk: Vec<FileEntry> = all_entries.iter().take(chunk_size).cloned().collect();
     let has_more = total_count > chunk_size;
 
-    // Cache the entries with cursor position
+    // Start watching the directory immediately
+    // Clone entries for the watcher (it needs its own copy for diff computation)
+    if let Err(e) = start_watching(&session_id, path, all_entries.clone()) {
+        eprintln!("[SESSION] Failed to start watcher: {}", e);
+        // Continue anyway - watcher is optional enhancement
+    }
+
+    // Cache the entries with cursor position (no expiry)
     if let Ok(mut cache) = SESSION_CACHE.write() {
         cache.insert(
             session_id.clone(),
             CachedDirectory {
+                path: path.to_path_buf(),
                 entries: all_entries,
                 cursor: chunk_size.min(total_count),
-                created_at: Instant::now(),
             },
         );
-
-        // Clean up old sessions (older than 60 seconds)
-        cache.retain(|_, v| v.created_at.elapsed().as_secs() < 60);
     }
 
     Ok(SessionStartResult {
@@ -357,6 +363,10 @@ pub fn list_directory_next(session_id: &str, chunk_size: usize) -> Result<ChunkN
 /// # Arguments
 /// * `session_id` - The session ID to clean up
 pub fn list_directory_end(session_id: &str) {
+    // Stop the file watcher
+    stop_watching(session_id);
+
+    // Remove from session cache
     if let Ok(mut cache) = SESSION_CACHE.write() {
         cache.remove(session_id);
     }

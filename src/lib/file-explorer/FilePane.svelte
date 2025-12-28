@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { onMount, tick, untrack } from 'svelte'
-    import type { FileEntry } from './types'
+    import { onMount, tick, untrack, onDestroy } from 'svelte'
+    import type { FileEntry, DirectoryDiff } from './types'
     import {
         listen,
         openFile,
@@ -13,6 +13,7 @@
     } from '$lib/tauri-commands'
     import FileList from './FileList.svelte'
     import SelectionInfo from './SelectionInfo.svelte'
+    import { applyDiff } from './apply-diff'
 
     /** Chunk size for loading large directories */
     const CHUNK_SIZE = 5000
@@ -45,6 +46,11 @@
 
     // Track the current load operation to cancel outdated ones
     let loadGeneration = 0
+    // Track current session for file watching
+    let currentSessionId = ''
+    let lastSequence = 0
+    let unlisten: UnlistenFn | undefined
+    let unlistenMenuAction: UnlistenFn | undefined
 
     // Filter files based on showHiddenFiles setting
     // Always keep ".." visible for parent navigation
@@ -83,6 +89,13 @@
         // Increment generation to cancel any in-flight requests
         const thisGeneration = ++loadGeneration
 
+        // End previous session (and watcher) when navigating away
+        if (currentSessionId) {
+            void listDirectoryEndSession(currentSessionId)
+            currentSessionId = ''
+            lastSequence = 0
+        }
+
         loading = true
         loadingMore = false
         error = null
@@ -100,6 +113,10 @@
                 void listDirectoryEndSession(startResult.sessionId)
                 return
             }
+
+            // Store session ID for file watching events
+            currentSessionId = startResult.sessionId
+            lastSequence = 0
 
             const parentEntry = createParentEntry(path)
             const firstChunk = parentEntry ? [parentEntry, ...startResult.entries] : startResult.entries
@@ -149,7 +166,19 @@
             filesVersion++ // Trigger reactivity
             totalCount = 0
             loading = false
+            currentSessionId = ''
+            lastSequence = 0
         }
+    }
+
+    /**
+     * Apply a diff from the file watcher to the file list.
+     * Wrapper around the extracted applyDiff function that updates component state.
+     */
+    function applyDiffToList(changes: Parameters<typeof applyDiff>[2]) {
+        selectedIndex = applyDiff(allFilesRaw, selectedIndex, changes)
+        filesVersion++ // Trigger re-render
+        totalCount = allFilesRaw.length
     }
 
     /**
@@ -196,9 +225,7 @@
         }
 
         loadingMore = false
-
-        // Clean up session
-        void endSession(sessionId)
+        // Session stays active for file watching - only end when navigating away
     }
 
     // Refresh icons for directories (custom folder icons) and extensions (file association changes)
@@ -311,14 +338,40 @@
         }
     })
 
-    onMount(() => {
-        void loadDirectory(currentPath)
+    onMount(async () => {
+        // Listen for directory diff events from the file watcher
+        // Wrapped in try-catch to handle test environments where Tauri isn't available
+        try {
+            unlisten = await listen<DirectoryDiff>('directory-diff', (event) => {
+                const diff = event.payload
+                // Only process diffs for our current session
+                if (diff.sessionId !== currentSessionId) return
 
-        let unlistenCleanup: UnlistenFn | undefined
+                // Check sequence - if we missed events, do full reload
+                if (diff.sequence !== lastSequence + 1) {
+                    // eslint-disable-next-line no-console
+                    console.warn('[FilePane] Sequence gap detected, reloading directory')
+                    void loadDirectory(currentPath)
+                    return
+                }
+
+                // Apply the diff
+                lastSequence = diff.sequence
+                applyDiffToList(diff.changes)
+
+                // Refresh icons for any new entries
+                const newEntries = diff.changes.filter((c) => c.type === 'add').map((c) => c.entry)
+                if (newEntries.length > 0) {
+                    void refreshIconsForCurrentDirectory(newEntries)
+                }
+            })
+        } catch {
+            // In test environment, Tauri API may not be available
+        }
 
         // Listen for menu actions from Rust
-        void (async () => {
-            unlistenCleanup = await listen<{ action: string; path: string }>('menu-action', (event) => {
+        try {
+            unlistenMenuAction = await listen<{ action: string; path: string }>('menu-action', (event) => {
                 if (isFocused && event.payload.action === 'get-info') {
                     if (selectedEntry.path === event.payload.path) {
                         // Show info in a simple way for now
@@ -330,11 +383,16 @@
                     }
                 }
             })
-        })()
-
-        return () => {
-            if (unlistenCleanup) unlistenCleanup()
+        } catch {
+            // In test environment, Tauri API may not be available
         }
+
+        void loadDirectory(currentPath)
+    })
+
+    onDestroy(() => {
+        unlisten?.()
+        unlistenMenuAction?.()
     })
 </script>
 

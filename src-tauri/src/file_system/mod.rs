@@ -17,11 +17,13 @@ pub use mock_provider::MockFileSystemProvider;
 pub use operations::{
     ChunkNextResult, SessionStartResult, list_directory_end, list_directory_next, list_directory_start,
 };
-// Re-export FileEntry for internal submodules (provider, mock_provider, real_provider)
+// FileEntry re-exported for test modules (provider, mock_provider, real_provider, mock_provider_test)
 #[cfg(test)]
 pub(crate) use operations::FileEntry;
 #[cfg(test)]
 pub use provider::FileSystemProvider;
+// Watcher management - init_watcher_manager must be called from lib.rs
+pub use watcher::init_watcher_manager;
 
 #[cfg(test)]
 mod operations_test;

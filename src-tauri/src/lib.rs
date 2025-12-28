@@ -4,9 +4,11 @@
 #![warn(unused_crate_dependencies)]
 
 //noinspection RsUnusedImport
-// Silence false positive for criterion (used only in benches/, not lib)
+// Silence false positives for dev dependencies (used only in benches/, not lib)
+// and transitive dependencies (notify is used by notify-debouncer-full)
 #[cfg(test)]
 use criterion as _;
+use notify as _;
 
 mod commands;
 pub mod config;
@@ -43,6 +45,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // Initialize the file watcher manager with app handle for events
+            file_system::init_watcher_manager(app.handle().clone());
+
             // Load persisted settings to initialize menu with correct state
             let saved_settings = settings::load_settings(app.handle());
 
