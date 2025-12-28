@@ -206,7 +206,7 @@ mod tests {
             let bundle_id = get_default_app_bundle_id(&uti);
             // Most systems have a default text editor, but this test shouldn't fail if not
             if let Some(bid) = bundle_id {
-                println!("Default app for .txt: {}", bid.to_string());
+                println!("Default app for .txt: {bid}");
             }
         }
     }

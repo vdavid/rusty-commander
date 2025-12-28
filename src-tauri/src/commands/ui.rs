@@ -1,4 +1,5 @@
 use crate::menu::{MenuState, build_context_menu};
+#[cfg(target_os = "macos")]
 use std::process::Command;
 use tauri::menu::ContextMenu;
 use tauri::{AppHandle, Emitter, Manager, Runtime, Window};
