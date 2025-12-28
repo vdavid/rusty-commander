@@ -1,21 +1,23 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte'
     import FilePane from './FilePane.svelte'
-    import { loadAppStatus, saveAppStatus } from '$lib/app-status-store'
+    import { loadAppStatus, saveAppStatus, type ViewMode } from '$lib/app-status-store'
     import { loadSettings, saveSettings, subscribeToSettingsChanges } from '$lib/settings-store'
-    import { pathExists } from '$lib/tauri-commands'
-    import type { UnlistenFn } from '@tauri-apps/api/event'
+    import { pathExists, listen, type UnlistenFn } from '$lib/tauri-commands'
 
     let leftPath = $state('~')
     let rightPath = $state('~')
     let focusedPane = $state<'left' | 'right'>('left')
     let showHiddenFiles = $state(true)
+    let leftViewMode = $state<ViewMode>('brief')
+    let rightViewMode = $state<ViewMode>('brief')
     let initialized = $state(false)
 
     let containerElement: HTMLDivElement | undefined = $state()
     let leftPaneRef: FilePane | undefined = $state()
     let rightPaneRef: FilePane | undefined = $state()
     let unlistenSettings: UnlistenFn | undefined
+    let unlistenViewMode: UnlistenFn | undefined
 
     function handleLeftPathChange(path: string) {
         leftPath = path
@@ -69,6 +71,8 @@
         rightPath = status.rightPath
         focusedPane = status.focusedPane
         showHiddenFiles = settings.showHiddenFiles
+        leftViewMode = status.leftViewMode
+        rightViewMode = status.rightViewMode
         initialized = true
 
         // Subscribe to settings changes from the backend menu
@@ -79,10 +83,24 @@
                 void saveSettings({ showHiddenFiles: newSettings.showHiddenFiles })
             }
         })
+
+        // Subscribe to view mode changes from the backend menu
+        unlistenViewMode = await listen<{ mode: ViewMode }>('view-mode-changed', (event) => {
+            const newMode = event.payload.mode
+            // Apply to the focused pane
+            if (focusedPane === 'left') {
+                leftViewMode = newMode
+                void saveAppStatus({ leftViewMode: newMode })
+            } else {
+                rightViewMode = newMode
+                void saveAppStatus({ rightViewMode: newMode })
+            }
+        })
     })
 
     onDestroy(() => {
         unlistenSettings?.()
+        unlistenViewMode?.()
     })
 
     // Focus the container after initialization so keyboard events work
@@ -108,6 +126,7 @@
             initialPath={leftPath}
             isFocused={focusedPane === 'left'}
             {showHiddenFiles}
+            viewMode={leftViewMode}
             onPathChange={handleLeftPathChange}
             onRequestFocus={handleLeftFocus}
         />
@@ -116,6 +135,7 @@
             initialPath={rightPath}
             isFocused={focusedPane === 'right'}
             {showHiddenFiles}
+            viewMode={rightViewMode}
             onPathChange={handleRightPathChange}
             onRequestFocus={handleRightFocus}
         />

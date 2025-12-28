@@ -11,7 +11,9 @@
         listDirectoryEndSession,
         type UnlistenFn,
     } from '$lib/tauri-commands'
+    import type { ViewMode } from '$lib/app-status-store'
     import FileList from './FileList.svelte'
+    import BriefList from './BriefList.svelte'
     import SelectionInfo from './SelectionInfo.svelte'
     import { applyDiff } from './apply-diff'
 
@@ -22,11 +24,19 @@
         initialPath: string
         isFocused?: boolean
         showHiddenFiles?: boolean
+        viewMode?: ViewMode
         onPathChange?: (path: string) => void
         onRequestFocus?: () => void
     }
 
-    const { initialPath, isFocused = false, showHiddenFiles = true, onPathChange, onRequestFocus }: Props = $props()
+    const {
+        initialPath,
+        isFocused = false,
+        showHiddenFiles = true,
+        viewMode = 'brief',
+        onPathChange,
+        onRequestFocus,
+    }: Props = $props()
 
     let currentPath = $state(untrack(() => initialPath))
 
@@ -41,6 +51,7 @@
     let error = $state<string | null>(null)
     let selectedIndex = $state(0)
     let fileListRef: FileList | undefined = $state()
+    let briefListRef: BriefList | undefined = $state()
     /** Metadata for the current directory (used for ".." entry in SelectionInfo) */
     const currentDirModifiedAt = $state<number | undefined>(undefined)
 
@@ -136,8 +147,9 @@
 
                 // Scroll the selected folder into view (after DOM updates)
                 void tick().then(() => {
+                    const listRef = viewMode === 'brief' ? briefListRef : fileListRef
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-                    fileListRef?.scrollToIndex(selectedIndex)
+                    listRef?.scrollToIndex(selectedIndex)
                 })
             } else {
                 selectedIndex = 0
@@ -284,27 +296,46 @@
 
     // Exported so DualPaneExplorer can forward keyboard events
     export function handleKeyDown(e: KeyboardEvent) {
-        if (e.key === 'ArrowDown') {
-            e.preventDefault()
-            const newIndex = Math.min(selectedIndex + 1, files.length - 1)
-            selectedIndex = newIndex
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            fileListRef?.scrollToIndex(newIndex)
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault()
-            const newIndex = Math.max(selectedIndex - 1, 0)
-            selectedIndex = newIndex
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            fileListRef?.scrollToIndex(newIndex)
-        } else if (e.key === 'Enter') {
+        // Handle navigation keys (Enter, Backspace) the same for both modes
+        if (e.key === 'Enter') {
             e.preventDefault()
             void handleNavigate(files[selectedIndex])
-        } else if (e.key === 'Backspace') {
+            return
+        }
+        if (e.key === 'Backspace') {
             e.preventDefault()
-            // Navigate to parent directory (same as activating ".." entry)
             const parentEntry = files.find((f) => f.name === '..')
             if (parentEntry) {
                 void handleNavigate(parentEntry)
+            }
+            return
+        }
+
+        // Handle arrow keys based on view mode
+        if (viewMode === 'brief') {
+            // BriefList handles all arrow keys (Up/Down for prev/next, Left/Right for columns)
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+            const newIndex: number | undefined = briefListRef?.handleKeyNavigation(e.key)
+            if (newIndex !== undefined) {
+                e.preventDefault()
+                selectedIndex = newIndex
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                briefListRef?.scrollToIndex(newIndex)
+            }
+        } else {
+            // Full mode: only Up/Down navigate
+            if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                const newIndex = Math.min(selectedIndex + 1, files.length - 1)
+                selectedIndex = newIndex
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                fileListRef?.scrollToIndex(newIndex)
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                const newIndex = Math.max(selectedIndex - 1, 0)
+                selectedIndex = newIndex
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                fileListRef?.scrollToIndex(newIndex)
             }
         }
         // Tab key bubbles up to DualPaneExplorer
@@ -333,9 +364,23 @@
         // Re-run when files change (which depends on showHiddenFiles)
         if (selectedIndex >= files.length && files.length > 0) {
             selectedIndex = 0
+
+            const listRef = viewMode === 'brief' ? briefListRef : fileListRef
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            fileListRef?.scrollToIndex(0)
+            listRef?.scrollToIndex(0)
         }
+    })
+
+    // Scroll selected item into view when view mode changes
+    $effect(() => {
+        // Track viewMode to trigger on change
+        void viewMode
+        // Wait for the new list component to mount and render
+        void tick().then(() => {
+            const listRef = viewMode === 'brief' ? briefListRef : fileListRef
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            listRef?.scrollToIndex(selectedIndex)
+        })
     })
 
     onMount(async () => {
@@ -413,6 +458,16 @@
             <div class="message">Loading...</div>
         {:else if error}
             <div class="error-message">{error}</div>
+        {:else if viewMode === 'brief'}
+            <BriefList
+                bind:this={briefListRef}
+                {files}
+                {selectedIndex}
+                {isFocused}
+                onSelect={handleSelect}
+                onNavigate={handleNavigate}
+                onContextMenu={handleContextMenu}
+            />
         {:else}
             <FileList
                 bind:this={fileListRef}
@@ -423,14 +478,17 @@
                 onNavigate={handleNavigate}
                 onContextMenu={handleContextMenu}
             />
-            {#if loadingMore}
-                <div class="loading-more">
-                    Loading {totalCount - allFilesRaw.length} more files...
-                </div>
-            {/if}
+        {/if}
+        {#if loadingMore}
+            <div class="loading-more">
+                Loading {totalCount - allFilesRaw.length} more files...
+            </div>
         {/if}
     </div>
-    <SelectionInfo entry={selectedEntry} {currentDirModifiedAt} />
+    <!-- SelectionInfo shown in brief mode (full mode will have inline metadata in the future) -->
+    {#if viewMode === 'brief'}
+        <SelectionInfo entry={selectedEntry} {currentDirModifiedAt} />
+    {/if}
 </div>
 
 <style>

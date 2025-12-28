@@ -14,8 +14,8 @@
 - [x] Display file info below each panel for the file under the cursor
 - [x] Add context menu for files and folders
 - [x] Add file watching to auto-update changes. It should be as close to immediate as possible
-- [ ] Implement proper Full view (with fixed columns)
-- [ ] Add Brief view with view switching option
+- [x] Implement proper Full view (with fixed columns)
+- [x] Add Brief view with view switching option
 - [ ] Add different sorting options
 - [ ] Make sure it lists Dropbox files correctly, incl. files that are loaded on the fly
 - [ ] When sorting alphabetically, sort numbers ascending, not alphabetically

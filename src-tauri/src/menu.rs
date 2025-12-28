@@ -8,6 +8,8 @@ use tauri::{
 
 /// Menu item IDs for file actions.
 pub const SHOW_HIDDEN_FILES_ID: &str = "show_hidden_files";
+pub const VIEW_MODE_FULL_ID: &str = "view_mode_full";
+pub const VIEW_MODE_BRIEF_ID: &str = "view_mode_brief";
 pub const OPEN_ID: &str = "open";
 pub const SHOW_IN_FINDER_ID: &str = "show_in_finder";
 pub const COPY_PATH_ID: &str = "copy_path";
@@ -25,6 +27,8 @@ pub struct MenuContext {
 /// Stores references to menu items and current context.
 pub struct MenuState<R: Runtime> {
     pub show_hidden_files: Mutex<Option<CheckMenuItem<R>>>,
+    pub view_mode_full: Mutex<Option<CheckMenuItem<R>>>,
+    pub view_mode_brief: Mutex<Option<CheckMenuItem<R>>>,
     pub context: Mutex<MenuContext>,
 }
 
@@ -32,16 +36,35 @@ impl<R: Runtime> Default for MenuState<R> {
     fn default() -> Self {
         Self {
             show_hidden_files: Mutex::new(None),
+            view_mode_full: Mutex::new(None),
+            view_mode_brief: Mutex::new(None),
             context: Mutex::new(MenuContext::default()),
         }
     }
+}
+
+/// Result struct for menu items that need to be stored.
+pub struct MenuItems<R: Runtime> {
+    pub menu: Menu<R>,
+    pub show_hidden_files: CheckMenuItem<R>,
+    pub view_mode_full: CheckMenuItem<R>,
+    pub view_mode_brief: CheckMenuItem<R>,
+}
+
+/// View mode type that matches the frontend type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ViewMode {
+    Full,
+    #[default]
+    Brief,
 }
 
 /// Builds the application menu with default macOS items plus a custom View and File submenu enhancements.
 pub fn build_menu<R: Runtime>(
     app: &AppHandle<R>,
     show_hidden_files: bool,
-) -> tauri::Result<(Menu<R>, CheckMenuItem<R>)> {
+    view_mode: ViewMode,
+) -> tauri::Result<MenuItems<R>> {
     // Start with the default menu (includes app menu with Quit, Hide, etc.)
     let menu = Menu::default(app)?;
 
@@ -76,20 +99,42 @@ pub fn build_menu<R: Runtime>(
     let show_hidden_item = CheckMenuItem::with_id(
         app,
         SHOW_HIDDEN_FILES_ID,
-        "Show Hidden Files",
+        "Show hidden files",
         true, // enabled
         show_hidden_files,
         Some("Cmd+Shift+."),
     )?;
 
-    // Find the existing View submenu and add our item to it
+    // Create view mode menu items (radio-style: one checked at a time)
+    let view_mode_full_item = CheckMenuItem::with_id(
+        app,
+        VIEW_MODE_FULL_ID,
+        "Full view",
+        true,
+        view_mode == ViewMode::Full,
+        Some("Cmd+1"),
+    )?;
+
+    let view_mode_brief_item = CheckMenuItem::with_id(
+        app,
+        VIEW_MODE_BRIEF_ID,
+        "Brief view",
+        true,
+        view_mode == ViewMode::Brief,
+        Some("Cmd+2"),
+    )?;
+
+    // Find the existing View submenu and add our items to it
     // The default menu on macOS has: App, File, Edit, View, Window, Help
     let mut found_view = false;
     for item in menu.items()? {
         if let tauri::menu::MenuItemKind::Submenu(submenu) = item
             && submenu.text()? == "View"
         {
-            // Add separator then our item
+            // Add separator then our items
+            submenu.append(&tauri::menu::PredefinedMenuItem::separator(app)?)?;
+            submenu.append(&view_mode_full_item)?;
+            submenu.append(&view_mode_brief_item)?;
             submenu.append(&tauri::menu::PredefinedMenuItem::separator(app)?)?;
             submenu.append(&show_hidden_item)?;
             found_view = true;
@@ -99,11 +144,26 @@ pub fn build_menu<R: Runtime>(
 
     // If View menu wasn't found (unlikely), create one
     if !found_view {
-        let view_menu = Submenu::with_items(app, "View", true, &[&show_hidden_item])?;
+        let view_menu = Submenu::with_items(
+            app,
+            "View",
+            true,
+            &[
+                &view_mode_full_item,
+                &view_mode_brief_item,
+                &tauri::menu::PredefinedMenuItem::separator(app)?,
+                &show_hidden_item,
+            ],
+        )?;
         menu.append(&view_menu)?;
     }
 
-    Ok((menu, show_hidden_item))
+    Ok(MenuItems {
+        menu,
+        show_hidden_files: show_hidden_item,
+        view_mode_full: view_mode_full_item,
+        view_mode_brief: view_mode_brief_item,
+    })
 }
 
 /// Builds a context menu for a specific file.

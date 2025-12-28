@@ -7,16 +7,22 @@ const STORE_NAME = 'app-status.json'
 const DEFAULT_PATH = '~'
 const ROOT_PATH = '/'
 
+export type ViewMode = 'full' | 'brief'
+
 export interface AppStatus {
     leftPath: string
     rightPath: string
     focusedPane: 'left' | 'right'
+    leftViewMode: ViewMode
+    rightViewMode: ViewMode
 }
 
 const DEFAULT_STATUS: AppStatus = {
     leftPath: DEFAULT_PATH,
     rightPath: DEFAULT_PATH,
     focusedPane: 'left',
+    leftViewMode: 'brief',
+    rightViewMode: 'brief',
 }
 
 let storeInstance: Store | null = null
@@ -56,6 +62,10 @@ async function resolvePathWithFallback(path: string, pathExists: (p: string) => 
     return DEFAULT_PATH
 }
 
+function parseViewMode(raw: unknown): ViewMode {
+    return raw === 'full' || raw === 'brief' ? raw : 'brief'
+}
+
 export async function loadAppStatus(pathExists: (p: string) => Promise<boolean>): Promise<AppStatus> {
     try {
         const store = await getStore()
@@ -63,6 +73,8 @@ export async function loadAppStatus(pathExists: (p: string) => Promise<boolean>)
         const rightPath = ((await store.get('rightPath')) as string) || DEFAULT_PATH
         const rawFocusedPane = await store.get('focusedPane')
         const focusedPane: 'left' | 'right' = rawFocusedPane === 'right' ? 'right' : 'left'
+        const leftViewMode = parseViewMode(await store.get('leftViewMode'))
+        const rightViewMode = parseViewMode(await store.get('rightViewMode'))
 
         // Resolve paths with fallback
         const resolvedLeftPath = await resolvePathWithFallback(leftPath, pathExists)
@@ -72,6 +84,8 @@ export async function loadAppStatus(pathExists: (p: string) => Promise<boolean>)
             leftPath: resolvedLeftPath,
             rightPath: resolvedRightPath,
             focusedPane,
+            leftViewMode,
+            rightViewMode,
         }
     } catch {
         // If store fails, return defaults
@@ -90,6 +104,12 @@ export async function saveAppStatus(status: Partial<AppStatus>): Promise<void> {
         }
         if (status.focusedPane !== undefined) {
             await store.set('focusedPane', status.focusedPane)
+        }
+        if (status.leftViewMode !== undefined) {
+            await store.set('leftViewMode', status.leftViewMode)
+        }
+        if (status.rightViewMode !== undefined) {
+            await store.set('rightViewMode', status.rightViewMode)
         }
     } catch {
         // Silently fail - persistence is nice-to-have

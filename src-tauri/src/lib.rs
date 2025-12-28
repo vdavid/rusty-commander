@@ -19,7 +19,7 @@ mod macos_icons;
 mod menu;
 mod settings;
 
-use menu::{MenuState, SHOW_HIDDEN_FILES_ID};
+use menu::{MenuState, SHOW_HIDDEN_FILES_ID, VIEW_MODE_BRIEF_ID, VIEW_MODE_FULL_ID, ViewMode};
 use tauri::{Emitter, Manager};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -52,12 +52,15 @@ pub fn run() {
             let saved_settings = settings::load_settings(app.handle());
 
             // Build and set the application menu with persisted showHiddenFiles
-            let (menu, show_hidden_item) = menu::build_menu(app.handle(), saved_settings.show_hidden_files)?;
-            app.set_menu(menu)?;
+            // Note: view mode is per-pane and managed by frontend, so we default to Brief here
+            let menu_items = menu::build_menu(app.handle(), saved_settings.show_hidden_files, ViewMode::Brief)?;
+            app.set_menu(menu_items.menu)?;
 
-            // Store the CheckMenuItem reference in app state
+            // Store the CheckMenuItem references in app state
             let menu_state = MenuState::default();
-            *menu_state.show_hidden_files.lock().unwrap() = Some(show_hidden_item);
+            *menu_state.show_hidden_files.lock().unwrap() = Some(menu_items.show_hidden_files);
+            *menu_state.view_mode_full.lock().unwrap() = Some(menu_items.view_mode_full);
+            *menu_state.view_mode_brief.lock().unwrap() = Some(menu_items.view_mode_brief);
             app.manage(menu_state);
 
             Ok(())
@@ -78,6 +81,25 @@ pub fn run() {
 
                 // Emit event to frontend with the new state
                 let _ = app.emit("settings-changed", serde_json::json!({ "showHiddenFiles": new_state }));
+            } else if id == VIEW_MODE_FULL_ID || id == VIEW_MODE_BRIEF_ID {
+                // Handle view mode toggle (radio button behavior)
+                let menu_state = app.state::<MenuState<tauri::Wry>>();
+
+                let (full_guard, brief_guard) = (
+                    menu_state.view_mode_full.lock().unwrap(),
+                    menu_state.view_mode_brief.lock().unwrap(),
+                );
+
+                if let (Some(full_item), Some(brief_item)) = (full_guard.as_ref(), brief_guard.as_ref()) {
+                    // Set the correct check state (radio behavior)
+                    let is_full = id == VIEW_MODE_FULL_ID;
+                    let _ = full_item.set_checked(is_full);
+                    let _ = brief_item.set_checked(!is_full);
+
+                    // Emit event to frontend
+                    let mode = if is_full { "full" } else { "brief" };
+                    let _ = app.emit("view-mode-changed", serde_json::json!({ "mode": mode }));
+                }
             } else {
                 // Handle file actions
                 commands::ui::execute_menu_action(app, id);

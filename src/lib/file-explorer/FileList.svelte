@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { FileEntry } from './types'
     import { getCachedIcon, prefetchIcons, iconCacheVersion } from '$lib/icon-cache'
+    import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
 
     interface Props {
         files: FileEntry[]
@@ -20,18 +21,26 @@
     // Buffer items above/below viewport to reduce gaps during fast scrolling
     const BUFFER_SIZE = 20
 
+    // Size tier colors for digit triads (indexed: 0=bytes, 1=kB, 2=MB, 3=GB, 4=TB+)
+    const sizeTierClasses = ['size-bytes', 'size-kb', 'size-mb', 'size-gb', 'size-tb']
+
     // ==== Virtual scrolling state ====
     let scrollContainer: HTMLDivElement | undefined = $state()
     let containerHeight = $state(0)
     let scrollTop = $state(0)
 
     // ==== Virtual scrolling derived calculations ====
-    const startIndex = $derived(Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_SIZE))
-    const visibleCount = $derived(Math.ceil(containerHeight / ROW_HEIGHT) + BUFFER_SIZE * 2)
-    const endIndex = $derived(Math.min(startIndex + visibleCount, files.length))
-    const visibleFiles = $derived(files.slice(startIndex, endIndex))
-    const totalHeight = $derived(files.length * ROW_HEIGHT)
-    const offsetY = $derived(startIndex * ROW_HEIGHT)
+    const virtualWindow = $derived(
+        calculateVirtualWindow({
+            direction: 'vertical',
+            itemSize: ROW_HEIGHT,
+            bufferSize: BUFFER_SIZE,
+            containerSize: containerHeight,
+            scrollOffset: scrollTop,
+            totalItems: files.length,
+        }),
+    )
+    const visibleFiles = $derived(files.slice(virtualWindow.startIndex, virtualWindow.endIndex))
 
     function handleScroll(e: Event) {
         const target = e.target as HTMLDivElement
@@ -78,35 +87,85 @@
         return '📄'
     }
 
-    function formatName(entry: FileEntry): string {
-        return entry.name
+    /** Formats a number into digit triads with CSS classes for coloring */
+    function formatSizeTriads(bytes: number): { value: string; tierClass: string }[] {
+        const str = String(bytes)
+        const triads: { value: string; tierClass: string }[] = []
+
+        let remaining = str
+        let tierIndex = 0
+        while (remaining.length > 0) {
+            const start = Math.max(0, remaining.length - 3)
+            const triad = remaining.slice(start)
+            remaining = remaining.slice(0, start)
+
+            triads.unshift({
+                value: triad,
+                tierClass: sizeTierClasses[Math.min(tierIndex, sizeTierClasses.length - 1)],
+            })
+            tierIndex++
+        }
+
+        // Add thin space separator between triads
+        return triads.map((t, i) => ({
+            ...t,
+            value: i < triads.length - 1 ? t.value + '\u2009' : t.value,
+        }))
+    }
+
+    /** Formats bytes as human-readable (for tooltip) */
+    function formatHumanReadable(bytes: number): string {
+        const units = ['bytes', 'KB', 'MB', 'GB', 'TB']
+        let value = bytes
+        let unitIndex = 0
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024
+            unitIndex++
+        }
+        const valueStr = unitIndex === 0 ? String(value) : value.toFixed(2)
+        return `${valueStr} ${units[unitIndex]}`
+    }
+
+    /** Formats timestamp as YYYY-MM-DD hh:mm */
+    function formatDate(timestamp: number | undefined): string {
+        if (timestamp === undefined) return ''
+        const date = new Date(timestamp * 1000)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const year = date.getFullYear()
+        const month = pad(date.getMonth() + 1)
+        const day = pad(date.getDate())
+        const hours = pad(date.getHours())
+        const mins = pad(date.getMinutes())
+        return `${String(year)}-${month}-${day} ${hours}:${mins}`
     }
 
     function handleClick(actualIndex: number) {
         onSelect(actualIndex)
     }
 
+    // Keep selected item in view when container height changes (window resize)
+    $effect(() => {
+        // Track containerHeight to trigger on resize
+        if (containerHeight > 0 && scrollContainer) {
+            const newScrollTop = getScrollToPosition(selectedIndex, ROW_HEIGHT, scrollTop, containerHeight)
+            if (newScrollTop !== undefined) {
+                scrollContainer.scrollTop = newScrollTop
+            }
+        }
+    })
+
     function handleDoubleClick(actualIndex: number) {
         onNavigate(files[actualIndex])
     }
 
     // Exported for parent to call when arrow keys change selection
-    // With virtual scrolling, we calculate the target scroll position mathematically
     export function scrollToIndex(index: number) {
         if (!scrollContainer) return
 
-        const targetTop = index * ROW_HEIGHT
-        const targetBottom = targetTop + ROW_HEIGHT
-        const viewportBottom = scrollTop + containerHeight
-
-        if (targetTop < scrollTop) {
-            // Item is above viewport - scroll up to show it
-            scrollContainer.scrollTop = targetTop
-        } else if (targetBottom > viewportBottom) {
-            // Item is below viewport - scroll down to show it
-            scrollContainer.scrollTop = targetBottom - containerHeight
+        const newScrollTop = getScrollToPosition(index, ROW_HEIGHT, scrollTop, containerHeight)
+        if (newScrollTop !== undefined) {
+            scrollContainer.scrollTop = newScrollTop
         }
-        // else: item already visible, no scroll needed
     }
 </script>
 
@@ -121,11 +180,11 @@
     aria-activedescendant={files[selectedIndex] ? `file-${String(selectedIndex)}` : undefined}
 >
     <!-- Spacer div provides accurate scrollbar for full list size -->
-    <div class="virtual-spacer" style="height: {totalHeight}px;">
+    <div class="virtual-spacer" style="height: {virtualWindow.totalSize}px;">
         <!-- Visible window positioned with translateY -->
-        <div class="virtual-window" style="transform: translateY({offsetY}px);">
+        <div class="virtual-window" style="transform: translateY({virtualWindow.offset}px);">
             {#each visibleFiles as file, localIndex (file.path)}
-                {@const actualIndex = startIndex + localIndex}
+                {@const actualIndex = virtualWindow.startIndex + localIndex}
                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
                 <div
                     id={`file-${String(actualIndex)}`}
@@ -146,7 +205,7 @@
                     role="option"
                     aria-selected={actualIndex === selectedIndex}
                 >
-                    <span class="icon-wrapper">
+                    <span class="col-icon">
                         {#if getIconUrl(file)}
                             <img class="icon" src={getIconUrl(file)} alt="" width="16" height="16" />
                         {:else}
@@ -156,7 +215,17 @@
                             <span class="symlink-badge">🔗</span>
                         {/if}
                     </span>
-                    <span class="name">{formatName(file)}</span>
+                    <span class="col-name">{file.name}</span>
+                    <span class="col-size" title={file.size !== undefined ? formatHumanReadable(file.size) : ''}>
+                        {#if file.isDirectory}
+                            <span class="size-dir">DIR</span>
+                        {:else if file.size !== undefined && file.name !== '..'}
+                            {#each formatSizeTriads(file.size) as triad, i (i)}
+                                <span class={triad.tierClass}>{triad.value}</span>
+                            {/each}
+                        {/if}
+                    </span>
+                    <span class="col-date">{formatDate(file.modifiedAt)}</span>
                 </div>
             {/each}
         </div>
@@ -190,21 +259,50 @@
         display: flex;
         align-items: center;
         gap: var(--spacing-sm);
+        height: 20px;
+        box-sizing: border-box;
     }
 
     .file-entry.is-selected {
-        background-color: rgba(204, 228, 247, 0.1); /* 10% of selection color for inactive pane */
+        background-color: rgba(204, 228, 247, 0.1);
     }
 
     .file-list.is-focused .file-entry.is-selected {
         background-color: var(--color-selection-bg);
     }
 
-    .icon-wrapper {
+    /* Column layout */
+    .col-icon {
         position: relative;
         width: 16px;
         height: 16px;
         flex-shrink: 0;
+    }
+
+    .col-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .is-directory .col-name {
+        font-weight: 600;
+    }
+
+    .col-size {
+        flex-shrink: 0;
+        width: 90px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .col-date {
+        flex-shrink: 0;
+        width: 120px;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.8;
     }
 
     .icon {
@@ -228,14 +326,30 @@
         line-height: 1;
     }
 
-    .name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+    /* Size tier colors - bytes are default text color - these are used dynamically */
+    /*noinspection CssUnusedSymbol*/
+    .size-bytes {
+        color: var(--color-text-tertiary);
+    }
+    /*noinspection CssUnusedSymbol*/
+    .size-kb {
+        color: var(--color-text-secondary);
+    }
+    /*noinspection CssUnusedSymbol*/
+    .size-mb {
+        color: var(--color-text-primary);
+    }
+    /*noinspection CssUnusedSymbol*/
+    .size-gb {
+        color: var(--color-warning);
+    }
+    /*noinspection CssUnusedSymbol*/
+    .size-tb {
+        color: var(--color-error);
     }
 
-    .is-directory .name {
-        font-weight: 600;
+    .size-dir {
+        color: var(--color-text-tertiary);
     }
 
     /* Dark mode: 10% of dark selection color #0a50d0 */
