@@ -9,11 +9,25 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::sync::LazyLock;
 use std::sync::RwLock;
+use std::time::Instant;
+use uuid::Uuid;
 use uzers::{get_group_by_gid, get_user_by_uid};
 
 /// Cache for uid→username and gid→groupname resolution.
 static OWNER_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 static GROUP_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Cache for directory listing sessions (cursor-based pagination).
+/// Key: session_id, Value: cached directory with cursor position.
+static SESSION_CACHE: LazyLock<RwLock<HashMap<String, CachedDirectory>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Cached directory entries for cursor-based pagination.
+struct CachedDirectory {
+    entries: Vec<FileEntry>,
+    cursor: usize,
+    created_at: Instant,
+}
 
 /// Resolves a uid to a username, with caching.
 fn get_owner_name(uid: u32) -> String {
@@ -95,10 +109,21 @@ pub struct FileEntry {
 /// A vector of FileEntry representing the directory contents, sorted with directories first,
 /// then files, both alphabetically.
 pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
+    let overall_start = std::time::Instant::now();
     let mut entries = Vec::new();
 
-    for entry in fs::read_dir(path)? {
+    let mut metadata_time = std::time::Duration::ZERO;
+    let mut owner_lookup_time = std::time::Duration::ZERO;
+    let mut entry_creation_time = std::time::Duration::ZERO;
+
+    let read_start = std::time::Instant::now();
+    let dir_entries: Vec<_> = fs::read_dir(path)?.collect();
+    let read_dir_time = read_start.elapsed();
+
+    for entry in dir_entries {
         let entry = entry?;
+
+        let meta_start = std::time::Instant::now();
         let file_type = entry.file_type()?;
         let is_symlink = file_type.is_symlink();
 
@@ -116,6 +141,7 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
         } else {
             entry.metadata()
         };
+        metadata_time += meta_start.elapsed();
 
         match metadata {
             Ok(metadata) => {
@@ -138,6 +164,12 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
                 let uid = metadata.uid();
                 let gid = metadata.gid();
 
+                let owner_start = std::time::Instant::now();
+                let owner = get_owner_name(uid);
+                let group = get_group_name(gid);
+                owner_lookup_time += owner_start.elapsed();
+
+                let create_start = std::time::Instant::now();
                 entries.push(FileEntry {
                     name: name.clone(),
                     path: entry.path().to_string_lossy().to_string(),
@@ -147,10 +179,11 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
                     modified_at: modified,
                     created_at: created,
                     permissions: metadata.permissions().mode(),
-                    owner: get_owner_name(uid),
-                    group: get_group_name(gid),
+                    owner,
+                    group,
                     icon_id: get_icon_id(is_dir, is_symlink, &name),
                 });
+                entry_creation_time += create_start.elapsed();
             }
             Err(_) => {
                 // Permission denied or broken symlink—return minimal entry
@@ -176,12 +209,138 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
         }
     }
 
+    let sort_start = std::time::Instant::now();
     // Sort: directories first, then files, both alphabetically
     entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
+    let sort_time = sort_start.elapsed();
+
+    let total_time = overall_start.elapsed();
+    eprintln!(
+        "[RUST TIMING] list_directory: path={}, entries={}, read_dir={}ms, metadata={}ms, owner={}ms, create={}ms, sort={}ms, total={}ms",
+        path.display(),
+        entries.len(),
+        read_dir_time.as_millis(),
+        metadata_time.as_millis(),
+        owner_lookup_time.as_millis(),
+        entry_creation_time.as_millis(),
+        sort_time.as_millis(),
+        total_time.as_millis()
+    );
 
     Ok(entries)
+}
+
+// ============================================================================
+// Cursor-based pagination API (session-based, reads directory only once)
+// ============================================================================
+
+/// Result of starting a new directory listing session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStartResult {
+    /// Unique session ID for subsequent next/end calls
+    pub session_id: String,
+    /// Total number of entries in the directory
+    pub total_count: usize,
+    /// First chunk of entries
+    pub entries: Vec<FileEntry>,
+    /// Whether there are more entries to fetch
+    pub has_more: bool,
+}
+
+/// Result of fetching the next chunk in a session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChunkNextResult {
+    /// Chunk of entries
+    pub entries: Vec<FileEntry>,
+    /// Whether there are more entries to fetch
+    pub has_more: bool,
+}
+
+/// Starts a new paginated directory listing session.
+///
+/// Reads the directory once, caches it, and returns the first chunk.
+/// Use `list_directory_next` to get subsequent chunks.
+/// Call `list_directory_end` to clean up when done.
+///
+/// # Arguments
+/// * `path` - The directory path to list
+/// * `chunk_size` - Number of entries to return in the first chunk
+///
+/// # Returns
+/// A `SessionStartResult` with session ID, total count, and first chunk.
+pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionStartResult, std::io::Error> {
+    // Read and sort the directory once
+    let all_entries = list_directory(path)?;
+    let total_count = all_entries.len();
+
+    // Generate session ID
+    let session_id = Uuid::new_v4().to_string();
+
+    // Extract first chunk
+    let first_chunk: Vec<FileEntry> = all_entries.iter().take(chunk_size).cloned().collect();
+    let has_more = total_count > chunk_size;
+
+    // Cache the entries with cursor position
+    if let Ok(mut cache) = SESSION_CACHE.write() {
+        cache.insert(
+            session_id.clone(),
+            CachedDirectory {
+                entries: all_entries,
+                cursor: chunk_size.min(total_count),
+                created_at: Instant::now(),
+            },
+        );
+
+        // Clean up old sessions (older than 60 seconds)
+        cache.retain(|_, v| v.created_at.elapsed().as_secs() < 60);
+    }
+
+    Ok(SessionStartResult {
+        session_id,
+        total_count,
+        entries: first_chunk,
+        has_more,
+    })
+}
+
+/// Gets the next chunk of entries from a cached session.
+///
+/// # Arguments
+/// * `session_id` - The session ID from `list_directory_start`
+/// * `chunk_size` - Number of entries to return
+///
+/// # Returns
+/// A `ChunkNextResult` with entries and has_more flag.
+pub fn list_directory_next(session_id: &str, chunk_size: usize) -> Result<ChunkNextResult, String> {
+    let mut cache = SESSION_CACHE.write().map_err(|_| "Failed to acquire cache lock")?;
+
+    let session = cache
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+
+    let start = session.cursor;
+    let end = (start + chunk_size).min(session.entries.len());
+
+    let entries: Vec<FileEntry> = session.entries[start..end].to_vec();
+    session.cursor = end;
+
+    let has_more = end < session.entries.len();
+
+    Ok(ChunkNextResult { entries, has_more })
+}
+
+/// Ends a directory listing session and cleans up the cache.
+///
+/// # Arguments
+/// * `session_id` - The session ID to clean up
+pub fn list_directory_end(session_id: &str) {
+    if let Ok(mut cache) = SESSION_CACHE.write() {
+        cache.remove(session_id);
+    }
 }

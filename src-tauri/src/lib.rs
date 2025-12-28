@@ -3,6 +3,11 @@
 // Warn on unused dependencies to catch platform-specific cfg mismatches
 #![warn(unused_crate_dependencies)]
 
+//noinspection RsUnusedImport
+// Silence false positive for criterion (used only in benches/, not lib)
+#[cfg(test)]
+use criterion as _;
+
 mod commands;
 pub mod config;
 mod file_system;
@@ -70,7 +75,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            commands::file_system::list_directory_contents,
+            commands::file_system::list_directory_start_session,
+            commands::file_system::list_directory_next_chunk,
+            commands::file_system::list_directory_end_session,
             commands::file_system::path_exists,
             commands::icons::get_icons,
             commands::icons::refresh_directory_icons

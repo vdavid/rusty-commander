@@ -2,16 +2,37 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { openPath } from '@tauri-apps/plugin-opener'
-import type { FileEntry } from './file-explorer/types'
+import type { ChunkNextResult, SessionStartResult } from './file-explorer/types'
+
+// ============================================================================
+// Cursor-based pagination API (session-based)
+// ============================================================================
 
 /**
- * Lists the contents of a directory.
+ * Starts a new paginated directory listing session.
+ * Reads the directory once, caches on backend, returns first chunk immediately.
  * @param path - Directory path to list. Supports tilde expansion (~).
- * @returns Array of file entries, sorted with directories first.
- * @throws Error if directory cannot be read (permission denied, not found, etc.)
+ * @param chunkSize - Number of entries in the first chunk.
  */
-export async function listDirectoryContents(path: string): Promise<FileEntry[]> {
-    return invoke<FileEntry[]>('list_directory_contents', { path })
+export async function listDirectoryStartSession(path: string, chunkSize: number): Promise<SessionStartResult> {
+    return invoke<SessionStartResult>('list_directory_start_session', { path, chunkSize })
+}
+
+/**
+ * Gets the next chunk of entries from a cached session.
+ * @param sessionId - The session ID from listDirectoryStartSession.
+ * @param chunkSize - Number of entries to return.
+ */
+export async function listDirectoryNextChunk(sessionId: string, chunkSize: number): Promise<ChunkNextResult> {
+    return invoke<ChunkNextResult>('list_directory_next_chunk', { sessionId, chunkSize })
+}
+
+/**
+ * Ends a directory listing session and cleans up the cache.
+ * @param sessionId - The session ID to clean up.
+ */
+export async function listDirectoryEndSession(sessionId: string): Promise<void> {
+    await invoke('list_directory_end_session', { sessionId })
 }
 
 /**

@@ -1,28 +1,10 @@
 //! Tauri commands for file system operations.
 
-use crate::file_system::{FileEntry, FileSystemProvider, RealFileSystemProvider};
+use crate::file_system::{
+    ChunkNextResult, SessionStartResult, list_directory_end as ops_list_directory_end,
+    list_directory_next as ops_list_directory_next, list_directory_start as ops_list_directory_start,
+};
 use std::path::PathBuf;
-
-/// Lists the contents of a directory.
-///
-/// # Arguments
-/// * `path` - The directory path to list. Supports tilde expansion (~).
-///
-/// # Returns
-/// A vector of FileEntry representing the directory contents, sorted with directories first.
-///
-/// # Errors
-/// Returns an error string if the directory cannot be read (e.g., permission denied, path not found).
-#[tauri::command]
-pub fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
-    let expanded_path = expand_tilde(&path);
-    let path_buf = PathBuf::from(expanded_path);
-
-    let provider = RealFileSystemProvider;
-    provider
-        .list_directory(&path_buf)
-        .map_err(|e| format!("Failed to read directory '{}': {}", path, e))
-}
 
 /// Checks if a path exists.
 ///
@@ -36,6 +18,46 @@ pub fn path_exists(path: String) -> bool {
     let expanded_path = expand_tilde(&path);
     let path_buf = PathBuf::from(expanded_path);
     path_buf.exists()
+}
+
+// ============================================================================
+// Cursor-based pagination API
+// ============================================================================
+
+/// Starts a new paginated directory listing session.
+///
+/// Reads the directory once, caches it, and returns the first chunk.
+/// Use `list_directory_next_chunk` to get subsequent chunks.
+/// Call `list_directory_end_session` when done.
+///
+/// # Arguments
+/// * `path` - The directory path to list. Supports tilde expansion (~).
+/// * `chunk_size` - Number of entries in the first chunk.
+#[tauri::command]
+pub fn list_directory_start_session(path: String, chunk_size: usize) -> Result<SessionStartResult, String> {
+    let expanded_path = expand_tilde(&path);
+    let path_buf = PathBuf::from(&expanded_path);
+    ops_list_directory_start(&path_buf, chunk_size)
+        .map_err(|e| format!("Failed to start directory listing '{}': {}", path, e))
+}
+
+/// Gets the next chunk of entries from a cached session.
+///
+/// # Arguments
+/// * `session_id` - The session ID from `list_directory_start_session`.
+/// * `chunk_size` - Number of entries to return.
+#[tauri::command]
+pub fn list_directory_next_chunk(session_id: String, chunk_size: usize) -> Result<ChunkNextResult, String> {
+    ops_list_directory_next(&session_id, chunk_size)
+}
+
+/// Ends a directory listing session and cleans up the cache.
+///
+/// # Arguments
+/// * `session_id` - The session ID to clean up.
+#[tauri::command]
+pub fn list_directory_end_session(session_id: String) {
+    ops_list_directory_end(&session_id);
 }
 
 /// Expands tilde (~) to the user's home directory.

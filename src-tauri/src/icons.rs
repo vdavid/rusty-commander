@@ -127,17 +127,9 @@ fn fetch_fresh_extension_icon(ext: &str) -> Option<String> {
     // This bypasses the Launch Services icon cache
     #[cfg(target_os = "macos")]
     {
-        eprintln!("[DEBUG] Trying fresh icon for ext: {}", ext);
         if let Some(img) = crate::macos_icons::fetch_fresh_icon_for_extension(ext) {
-            eprintln!(
-                "[DEBUG] Got fresh icon for ext: {} ({}x{})",
-                ext,
-                img.width(),
-                img.height()
-            );
             return image_to_data_url(&img);
         }
-        eprintln!("[DEBUG] Fresh icon failed for ext: {}, falling back to temp file", ext);
     }
 
     // Fallback: use temp file approach (works on all platforms, but may use cached icons)

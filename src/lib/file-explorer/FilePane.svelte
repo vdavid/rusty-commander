@@ -1,35 +1,38 @@
 <script lang="ts">
     import { onMount, untrack } from 'svelte'
     import type { FileEntry } from './types'
-    import type { FileService } from '$lib/file-service'
-    import { defaultFileService } from '$lib/file-service'
     import { openFile } from '$lib/tauri-commands'
     import FileList from './FileList.svelte'
 
+    /** Chunk size for loading large directories */
+    const CHUNK_SIZE = 5000
+
     interface Props {
         initialPath: string
-        fileService?: FileService
         isFocused?: boolean
         showHiddenFiles?: boolean
         onPathChange?: (path: string) => void
         onRequestFocus?: () => void
     }
 
-    const {
-        initialPath,
-        fileService = defaultFileService,
-        isFocused = false,
-        showHiddenFiles = true,
-        onPathChange,
-        onRequestFocus,
-    }: Props = $props()
+    const { initialPath, isFocused = false, showHiddenFiles = true, onPathChange, onRequestFocus }: Props = $props()
 
     let currentPath = $state(untrack(() => initialPath))
-    let allFiles = $state<FileEntry[]>([])
+
+    // PERFORMANCE: Store files in plain JS (NOT reactive) to avoid 50k-item reactivity overhead
+    // Use filesVersion to manually trigger re-renders when the list changes
+    let allFilesRaw: FileEntry[] = []
+    let filesVersion = $state(0)
+
     let loading = $state(true)
+    let loadingMore = $state(false)
+    let totalCount = $state(0)
     let error = $state<string | null>(null)
     let selectedIndex = $state(0)
     let fileListRef: FileList | undefined = $state()
+
+    // Track the current load operation to cancel outdated ones
+    let loadGeneration = 0
 
     // Filter files based on showHiddenFiles setting
     // Always keep ".." visible for parent navigation
@@ -39,7 +42,11 @@
     }
 
     // Compute visible files based on showHiddenFiles prop
-    const files = $derived(filterFiles(allFiles, showHiddenFiles))
+    // Note: filesVersion is read to trigger re-computation when allFilesRaw changes
+    const files = $derived.by(() => {
+        void filesVersion // Dependency trigger
+        return filterFiles(allFilesRaw, showHiddenFiles)
+    })
 
     // Create ".." entry for parent navigation
     function createParentEntry(path: string): FileEntry | null {
@@ -58,33 +65,123 @@
     }
 
     async function loadDirectory(path: string, selectName?: string) {
-        loading = true
-        error = null
-        try {
-            const entries = await fileService.listDirectory(path)
-            const parentEntry = createParentEntry(path)
-            allFiles = parentEntry ? [parentEntry, ...entries] : entries
+        // Increment generation to cancel any in-flight requests
+        const thisGeneration = ++loadGeneration
 
-            // If selectName is provided, find and select that entry
-            // But only if it's visible (not filtered out)
+        loading = true
+        loadingMore = false
+        error = null
+        allFilesRaw = []
+        filesVersion++ // Trigger reactivity
+        totalCount = 0
+
+        try {
+            // Import session API functions
+            const { listDirectoryStartSession, listDirectoryNextChunk, listDirectoryEndSession } =
+                await import('$lib/tauri-commands')
+
+            // Start session - reads directory ONCE, returns first chunk immediately
+            const startResult = await listDirectoryStartSession(path, CHUNK_SIZE)
+
+            // Check if this load was cancelled
+            if (thisGeneration !== loadGeneration) {
+                // Clean up abandoned session
+                void listDirectoryEndSession(startResult.sessionId)
+                return
+            }
+
+            const parentEntry = createParentEntry(path)
+            const firstChunk = parentEntry ? [parentEntry, ...startResult.entries] : startResult.entries
+
+            // +1 for parent entry if present
+            totalCount = parentEntry ? startResult.totalCount + 1 : startResult.totalCount
+
+            // Display first chunk immediately!
+            allFilesRaw = firstChunk
+            filesVersion++
+
+            // Set selection
             if (selectName) {
-                const visibleFiles = filterFiles(allFiles, showHiddenFiles)
+                const visibleFiles = filterFiles(firstChunk, showHiddenFiles)
                 const targetIndex = visibleFiles.findIndex((f) => f.name === selectName)
-                // If target is hidden (e.g., navigating up from .config with hidden files off),
-                // fall back to index 0
                 selectedIndex = targetIndex >= 0 ? targetIndex : 0
             } else {
                 selectedIndex = 0
             }
 
-            // Refresh icons for directories and extensions in the background
-            void refreshIconsForCurrentDirectory(entries)
+            loading = false
+
+            // Start icon refresh for first chunk (non-blocking)
+            void refreshIconsForCurrentDirectory(firstChunk.filter((e) => e.name !== '..'))
+
+            // Load remaining chunks in background
+            if (startResult.hasMore) {
+                loadingMore = true
+                void loadRemainingChunksFromSession(
+                    startResult.sessionId,
+                    firstChunk,
+                    thisGeneration,
+                    listDirectoryNextChunk,
+                    listDirectoryEndSession,
+                )
+            }
         } catch (e) {
+            if (thisGeneration !== loadGeneration) return
             error = e instanceof Error ? e.message : String(e)
-            allFiles = []
-        } finally {
+            allFilesRaw = []
+            filesVersion++ // Trigger reactivity
+            totalCount = 0
             loading = false
         }
+    }
+
+    /**
+     * Loads remaining chunks from a session in the background.
+     * Uses requestAnimationFrame to avoid blocking the UI.
+     */
+    async function loadRemainingChunksFromSession(
+        sessionId: string,
+        initialEntries: FileEntry[],
+        generation: number,
+        nextChunk: (id: string, size: number) => Promise<{ entries: FileEntry[]; hasMore: boolean }>,
+        endSession: (id: string) => Promise<void>,
+    ) {
+        let currentEntries = initialEntries
+        let hasMore = true
+
+        while (hasMore) {
+            // Check if cancelled
+            if (generation !== loadGeneration) {
+                void endSession(sessionId)
+                return
+            }
+
+            // Wait for next animation frame to keep UI responsive
+            await new Promise((resolve) => requestAnimationFrame(resolve))
+
+            // Check again after await
+            if (generation !== loadGeneration) {
+                void endSession(sessionId)
+                return
+            }
+
+            // Fetch next chunk from cache (fast!)
+            const result = await nextChunk(sessionId, CHUNK_SIZE)
+            hasMore = result.hasMore
+
+            // Append entries
+            currentEntries = [...currentEntries, ...result.entries]
+            allFilesRaw = currentEntries
+            filesVersion++
+
+            // Refresh icons for new entries
+            void refreshIconsForCurrentDirectory(result.entries.filter((e) => e.name !== '..'))
+        }
+
+        loadingMore = false
+
+        // Clean up session
+        void endSession(sessionId)
     }
 
     // Refresh icons for directories (custom folder icons) and extensions (file association changes)
@@ -206,6 +303,11 @@
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
             />
+            {#if loadingMore}
+                <div class="loading-more">
+                    Loading {totalCount - allFilesRaw.length} more files...
+                </div>
+            {/if}
         {/if}
     </div>
 </div>
@@ -259,5 +361,14 @@
         color: var(--color-error);
         text-align: center;
         padding: var(--spacing-md);
+    }
+
+    .loading-more {
+        padding: var(--spacing-sm);
+        text-align: center;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        background-color: var(--color-bg-secondary);
+        border-top: 1px solid var(--color-border-primary);
     }
 </style>
