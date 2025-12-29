@@ -26,7 +26,7 @@
 - [ ] Load iCloud sync statuses, too
 - [ ] Load Google Drive sync statuses, too
 - [ ] Load OneDrive sync statuses, too?
--
+- [ ] Enable file drag&drop from the app to other apps.
 
 ## Cleanup
 
