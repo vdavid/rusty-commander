@@ -14,35 +14,48 @@ When making a significant technical decision (tech choice, architecture pattern,
 
 Accepted | Proposed | Deprecated | Superseded by ADR-XXX
 
-## Context
+## Summary
 
-What is the issue we're facing? What constraints exist?
+A short summary of the context, problem, solution, and consequences. In clear language, 3–4 sentences.
 
-## Decision
+## Context, problem, solution
 
-What are we doing about it?
+### Context
+
+Give all information that helps understand the background and reasoning behind the decision,
+everything that leads up to the problem statement, but not the problem itself.
+
+### Problem
+
+What is the issue we're facing? What constraints exist? How big is the impact? What are the non-goals?
+
+### Possible solutions considered
+
+What approaches have been considered to solve the problem, but not chosen? What were their tradeoffs?
+
+### Solution
+
+What did we decide to do? Why did we pick this? Elaborate on what we'll do.
 
 ## Consequences
 
 ### Positive
 
-- What becomes easier/better
+What becomes easier/better
 
 ### Negative
 
-- What becomes harder/worse
+What becomes harder/worse
 
 ### Notes (optional)
 
-- Additional context, links, future considerations
+Additional context, links, future considerations
 ```
 
-3. Link from `AGENTS.md` (or code comments if relevant)
-4. Do not commit unless asked to
+3. Link in `AGENTS.md` (or in code comments if relevant)
 
 ## Examples of decisions worth documenting
 
-- Choosing between competing libraries/frameworks
-- Changing build/test processes
-- Disabling/enabling linter rules project-wide
-- Adopting new conventions that differ from defaults
+- Technological choices: languages, libraries,frameworks, build/test processes, tooling
+- Architectural decisions
+- Adopting conventions that differ from defaults
