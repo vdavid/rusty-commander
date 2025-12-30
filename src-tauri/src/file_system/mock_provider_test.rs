@@ -20,6 +20,7 @@ fn test_mock_provider_returns_entries() {
             owner: "testuser".to_string(),
             group: "staff".to_string(),
             icon_id: "ext:txt".to_string(),
+            extended_metadata_loaded: true,
         },
         FileEntry {
             name: "folder".to_string(),
@@ -35,6 +36,7 @@ fn test_mock_provider_returns_entries() {
             owner: "testuser".to_string(),
             group: "staff".to_string(),
             icon_id: "dir".to_string(),
+            extended_metadata_loaded: true,
         },
     ];
 

@@ -1,8 +1,9 @@
 //! Tauri commands for file system operations.
 
 use crate::file_system::{
-    ChunkNextResult, SessionStartResult, list_directory_end as ops_list_directory_end,
-    list_directory_next as ops_list_directory_next, list_directory_start as ops_list_directory_start,
+    ChunkNextResult, ExtendedMetadata, SessionStartResult, get_extended_metadata_batch,
+    list_directory_end as ops_list_directory_end, list_directory_next as ops_list_directory_next,
+    list_directory_start as ops_list_directory_start,
 };
 use std::path::PathBuf;
 
@@ -58,6 +59,22 @@ pub fn list_directory_next_chunk(session_id: String, chunk_size: usize) -> Resul
 #[tauri::command]
 pub fn list_directory_end_session(session_id: String) {
     ops_list_directory_end(&session_id);
+}
+
+// ============================================================================
+// Two-phase metadata loading
+// ============================================================================
+
+/// Fetches extended metadata for a batch of file paths.
+///
+/// This is called after the initial directory listing to populate
+/// macOS-specific metadata (addedAt, openedAt) without blocking initial render.
+///
+/// # Arguments
+/// * `paths` - File paths to fetch extended metadata for.
+#[tauri::command]
+pub fn get_extended_metadata(paths: Vec<String>) -> Vec<ExtendedMetadata> {
+    get_extended_metadata_batch(paths)
 }
 
 /// Expands tilde (~) to the user's home directory.

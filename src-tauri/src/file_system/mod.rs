@@ -17,7 +17,8 @@ mod watcher;
 #[cfg(test)]
 pub use mock_provider::MockFileSystemProvider;
 pub use operations::{
-    ChunkNextResult, SessionStartResult, list_directory_end, list_directory_next, list_directory_start,
+    ChunkNextResult, ExtendedMetadata, SessionStartResult, get_extended_metadata_batch, list_directory_end,
+    list_directory_next, list_directory_start,
 };
 // FileEntry re-exported for test modules (provider, mock_provider, real_provider, mock_provider_test)
 #[cfg(test)]

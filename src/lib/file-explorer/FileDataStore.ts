@@ -1,4 +1,4 @@
-import type { FileEntry } from './types'
+import type { ExtendedMetadata, FileEntry } from './types'
 
 /**
  * Non-reactive file data store.
@@ -203,6 +203,38 @@ export function createFileDataStore() {
          */
         get syncStatusMap(): Record<string, string | undefined> {
             return _syncStatusMap
+        },
+
+        /**
+         * Merges extended metadata (addedAt, openedAt) into existing file entries.
+         * Used for two-phase metadata loading - core data first, extended later.
+         */
+        mergeExtendedData(extendedData: ExtendedMetadata[]): void {
+            if (extendedData.length === 0) return
+
+            // Create a lookup map for O(1) access
+            const extendedMap = new Map<string, ExtendedMetadata>()
+            for (const data of extendedData) {
+                extendedMap.set(data.path, data)
+            }
+
+            // Update allFiles entries
+            let updated = false
+            for (const entry of allFiles) {
+                const extended = extendedMap.get(entry.path)
+                if (extended) {
+                    entry.addedAt = extended.addedAt
+                    entry.openedAt = extended.openedAt
+                    entry.extendedMetadataLoaded = true
+                    updated = true
+                }
+            }
+
+            // Also update filteredFiles (same references, so should already be updated)
+            // But notify listeners so UI can re-render
+            if (updated) {
+                notifyListeners()
+            }
         },
 
         /**

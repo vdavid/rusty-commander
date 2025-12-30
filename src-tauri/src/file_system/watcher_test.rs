@@ -27,6 +27,7 @@ fn make_entry(name: &str, size: Option<u64>) -> FileEntry {
         owner: "user".to_string(),
         group: "group".to_string(),
         icon_id: "ext:txt".to_string(),
+        extended_metadata_loaded: true,
     }
 }
 

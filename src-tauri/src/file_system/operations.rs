@@ -104,6 +104,15 @@ pub struct FileEntry {
     pub owner: String,
     pub group: String,
     pub icon_id: String,
+    /// Whether extended metadata (addedAt, openedAt) has been loaded
+    /// Always true for legacy list_directory(), false for list_directory_core()
+    #[serde(default = "default_extended_loaded")]
+    pub extended_metadata_loaded: bool,
+}
+
+/// Default value for extended_metadata_loaded (for backwards compatibility)
+fn default_extended_loaded() -> bool {
+    true
 }
 
 /// Lists the contents of a directory.
@@ -199,6 +208,7 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
                     owner,
                     group,
                     icon_id: get_icon_id(is_dir, is_symlink, &name),
+                    extended_metadata_loaded: true,
                 });
                 entry_creation_time += create_start.elapsed();
             }
@@ -223,6 +233,7 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
                     } else {
                         "file".to_string()
                     },
+                    extended_metadata_loaded: true,
                 });
             }
         }
@@ -294,8 +305,9 @@ pub struct ChunkNextResult {
 /// # Returns
 /// A `SessionStartResult` with session ID, total count, and first chunk.
 pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionStartResult, std::io::Error> {
-    // Read and sort the directory once
-    let all_entries = list_directory(path)?;
+    // Use list_directory_core for fast initial loading (skips macOS extended metadata)
+    // Extended metadata (addedAt, openedAt) will be fetched later via get_extended_metadata
+    let all_entries = list_directory_core(path)?;
     let total_count = all_entries.len();
 
     // Generate session ID
@@ -306,7 +318,8 @@ pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionSta
     let has_more = total_count > chunk_size;
 
     // Start watching the directory immediately
-    // Clone entries for the watcher (it needs its own copy for diff computation)
+    // Watcher uses core metadata for diff computation (size, modifiedAt, permissions)
+    // Extended metadata is not needed for detecting file changes
     if let Err(e) = start_watching(&session_id, path, all_entries.clone()) {
         eprintln!("[SESSION] Failed to start watcher: {}", e);
         // Continue anyway - watcher is optional enhancement
@@ -370,4 +383,197 @@ pub fn list_directory_end(session_id: &str) {
     if let Ok(mut cache) = SESSION_CACHE.write() {
         cache.remove(session_id);
     }
+}
+
+// ============================================================================
+// Two-phase metadata loading: Fast core data, then extended metadata
+// ============================================================================
+
+/// Lists the contents of a directory with CORE metadata only.
+///
+/// This is significantly faster than `list_directory()` because it skips
+/// macOS-specific metadata (addedAt, openedAt) which require additional system calls.
+///
+/// Use `get_extended_metadata_batch()` to fetch extended metadata later.
+///
+/// # Arguments
+/// * `path` - The directory path to list
+///
+/// # Returns
+/// A vector of FileEntry with `extended_metadata_loaded = false`
+pub fn list_directory_core(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
+    let overall_start = std::time::Instant::now();
+    let mut entries = Vec::new();
+
+    let read_start = std::time::Instant::now();
+    let dir_entries: Vec<_> = fs::read_dir(path)?.collect();
+    let read_dir_time = read_start.elapsed();
+
+    let mut metadata_time = std::time::Duration::ZERO;
+    let mut owner_lookup_time = std::time::Duration::ZERO;
+
+    for entry in dir_entries {
+        let entry = entry?;
+
+        let meta_start = std::time::Instant::now();
+        let file_type = entry.file_type()?;
+        let is_symlink = file_type.is_symlink();
+
+        // For symlinks, check if the TARGET is a directory
+        let target_is_dir = if is_symlink {
+            fs::metadata(entry.path()).map(|m| m.is_dir()).unwrap_or(false)
+        } else {
+            false
+        };
+
+        // For symlinks, get metadata of the link itself (not target)
+        let metadata = if is_symlink {
+            fs::symlink_metadata(entry.path())
+        } else {
+            entry.metadata()
+        };
+        metadata_time += meta_start.elapsed();
+
+        match metadata {
+            Ok(metadata) => {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let is_dir = metadata.is_dir() || target_is_dir;
+
+                let modified = metadata
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs());
+
+                let created = metadata
+                    .created()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs());
+
+                let uid = metadata.uid();
+                let gid = metadata.gid();
+
+                let owner_start = std::time::Instant::now();
+                let owner = get_owner_name(uid);
+                let group = get_group_name(gid);
+                owner_lookup_time += owner_start.elapsed();
+
+                // SKIP macOS metadata - that's the key optimization!
+                entries.push(FileEntry {
+                    name: name.clone(),
+                    path: entry.path().to_string_lossy().to_string(),
+                    is_directory: is_dir,
+                    is_symlink,
+                    size: if metadata.is_file() { Some(metadata.len()) } else { None },
+                    modified_at: modified,
+                    created_at: created,
+                    added_at: None,  // Will be loaded later
+                    opened_at: None, // Will be loaded later
+                    permissions: metadata.permissions().mode(),
+                    owner,
+                    group,
+                    icon_id: get_icon_id(is_dir, is_symlink, &name),
+                    extended_metadata_loaded: false, // Not loaded yet!
+                });
+            }
+            Err(_) => {
+                // Permission denied or broken symlink
+                let name = entry.file_name().to_string_lossy().to_string();
+                entries.push(FileEntry {
+                    name: name.clone(),
+                    path: entry.path().to_string_lossy().to_string(),
+                    is_directory: false,
+                    is_symlink,
+                    size: None,
+                    modified_at: None,
+                    created_at: None,
+                    added_at: None,
+                    opened_at: None,
+                    permissions: 0,
+                    owner: String::new(),
+                    group: String::new(),
+                    icon_id: if is_symlink {
+                        "symlink-broken".to_string()
+                    } else {
+                        "file".to_string()
+                    },
+                    extended_metadata_loaded: true, // Nothing to load for broken entries
+                });
+            }
+        }
+    }
+
+    // Sort: directories first, then files, both alphabetically
+    entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+
+    let total_time = overall_start.elapsed();
+    eprintln!(
+        "[RUST TIMING] list_directory_core: path={}, entries={}, read_dir={}ms, metadata={}ms, owner={}ms, total={}ms",
+        path.display(),
+        entries.len(),
+        read_dir_time.as_millis(),
+        metadata_time.as_millis(),
+        owner_lookup_time.as_millis(),
+        total_time.as_millis()
+    );
+
+    Ok(entries)
+}
+
+/// Extended metadata for a single file (macOS-specific fields).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtendedMetadata {
+    /// File path (key for merging)
+    pub path: String,
+    /// When the file was added to its current directory (macOS only)
+    pub added_at: Option<u64>,
+    /// When the file was last opened (macOS only)
+    pub opened_at: Option<u64>,
+}
+
+/// Fetches extended metadata for a batch of file paths.
+///
+/// This is called after the initial directory listing to populate
+/// macOS-specific metadata (addedAt, openedAt) without blocking initial render.
+///
+/// # Arguments
+/// * `paths` - File paths to fetch extended metadata for
+///
+/// # Returns
+/// Vector of ExtendedMetadata for each path
+#[cfg(target_os = "macos")]
+pub fn get_extended_metadata_batch(paths: Vec<String>) -> Vec<ExtendedMetadata> {
+    use std::path::Path;
+
+    paths
+        .into_iter()
+        .map(|path_str| {
+            let path = Path::new(&path_str);
+            let macos_meta = super::macos_metadata::get_macos_metadata(path);
+            ExtendedMetadata {
+                path: path_str,
+                added_at: macos_meta.added_at,
+                opened_at: macos_meta.opened_at,
+            }
+        })
+        .collect()
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn get_extended_metadata_batch(paths: Vec<String>) -> Vec<ExtendedMetadata> {
+    // On non-macOS, there's no extended metadata to fetch
+    paths
+        .into_iter()
+        .map(|path_str| ExtendedMetadata {
+            path: path_str,
+            added_at: None,
+            opened_at: None,
+        })
+        .collect()
 }

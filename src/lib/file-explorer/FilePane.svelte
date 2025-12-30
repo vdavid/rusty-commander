@@ -10,6 +10,7 @@
         listDirectoryNextChunk,
         listDirectoryEndSession,
         getSyncStatus,
+        getExtendedMetadata,
         type UnlistenFn,
     } from '$lib/tauri-commands'
     import type { ViewMode } from '$lib/app-status-store'
@@ -108,6 +109,7 @@
             owner: '',
             group: '',
             iconId: 'dir',
+            extendedMetadataLoaded: true, // Parent entry doesn't need extended metadata
         }
     }
 
@@ -170,6 +172,9 @@
 
             // Fetch sync status for visible files (non-blocking)
             void fetchSyncStatusForEntries(firstChunk)
+
+            // Fetch extended metadata in background (Phase 2 of two-phase loading)
+            void fetchExtendedMetadataForEntries(firstChunk)
 
             // Load remaining chunks in background
             if (startResult.hasMore) {
@@ -279,6 +284,25 @@
             fileStore.setSyncStatusMap({ ...fileStore.syncStatusMap, ...statuses })
         } catch {
             // Silently ignore - sync status is optional
+        }
+    }
+
+    /**
+     * Fetch extended metadata (addedAt, openedAt) for entries.
+     * Called after initial directory load to populate macOS-specific metadata.
+     * This is Phase 2 of two-phase metadata loading.
+     */
+    async function fetchExtendedMetadataForEntries(entries: FileEntry[]) {
+        // Only fetch for entries that don't have extended metadata loaded
+        const paths = entries.filter((e) => e.name !== '..' && !e.extendedMetadataLoaded).map((e) => e.path)
+
+        if (paths.length === 0) return
+
+        try {
+            const extendedData = await getExtendedMetadata(paths)
+            fileStore.mergeExtendedData(extendedData)
+        } catch {
+            // Silently ignore - extended metadata is optional
         }
     }
 

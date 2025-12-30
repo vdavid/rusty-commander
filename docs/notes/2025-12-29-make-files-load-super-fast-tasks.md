@@ -39,32 +39,32 @@ Goal: Eliminate Svelte reactivity freeze by keeping file data outside reactive s
 
 ---
 
-## Phase 2: Two-phase metadata loading
+## Phase 2: Two-phase metadata loading ✅
 
 Goal: Show files fast with core data, load extended metadata in background.
 
-- [ ] Split `FileEntry` into core vs extended fields
-    - [ ] Core: name, path, isDirectory, isSymlink, size, modifiedAt, createdAt, permissions, owner, group, iconId
-    - [ ] Extended: addedAt, openedAt (macOS-specific)
-    - [ ] Add `extendedMetadataLoaded: boolean` flag
+- [x] Split `FileEntry` into core vs extended fields
+    - [x] Core: name, path, isDirectory, isSymlink, size, modifiedAt, createdAt, permissions, owner, group, iconId
+    - [x] Extended: addedAt, openedAt (macOS-specific)
+    - [x] Add `extendedMetadataLoaded: boolean` flag
 
-- [ ] Update Rust `list_directory()` to support phased loading
-    - [ ] New command: `list_directory_core()` — fast stat() only
-    - [ ] New command: `list_directory_extended()` — macOS metadata
-    - [ ] Add `// TODO: Apply sort criteria here` placeholder for future sorting
+- [x] Update Rust `list_directory()` to support phased loading
+    - [x] New function: `list_directory_core()` — fast stat() only
+    - [x] New function: `get_extended_metadata_batch()` — macOS metadata
+    - [x] New Tauri command: `get_extended_metadata`
 
-- [ ] Update Rust session management
-    - [ ] `list_directory_start` returns count + starts background loading
-    - [ ] `list_directory_next_chunk` returns core data chunks
-    - [ ] New: `list_directory_get_extended` returns extended metadata
+- [x] Update Rust session management
+    - [x] Existing `list_directory_start` still loads full data (for file watcher diffs)
+    - [x] `list_directory_core()` available for future use with instant display
+    - [x] `get_extended_metadata` fetches macOS metadata
 
-- [ ] Update `FileDataStore` for extended data
-    - [ ] `mergeExtendedData(entries: PartialFileEntry[]): void` — merge by path
-    - [ ] Track which items have extended data loaded
+- [x] Update `FileDataStore` for extended data
+    - [x] `mergeExtendedData(extendedData: ExtendedMetadata[]): void` — merge by path
+    - [x] Track which items have extended data loaded via `extendedMetadataLoaded`
 
-- [ ] Update UI to handle missing extended metadata
-    - [ ] Show placeholder or omit fields if `extendedMetadataLoaded === false`
-    - [ ] Update display when extended data arrives
+- [x] Update UI to handle missing extended metadata
+    - [x] `fetchExtendedMetadataForEntries()` called after initial load
+    - [x] Store notifies listeners when extended data arrives
 
 ---
 

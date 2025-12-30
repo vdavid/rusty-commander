@@ -111,6 +111,7 @@ pub fn run() {
             commands::file_system::list_directory_next_chunk,
             commands::file_system::list_directory_end_session,
             commands::file_system::path_exists,
+            commands::file_system::get_extended_metadata,
             commands::icons::get_icons,
             commands::icons::refresh_directory_icons,
             commands::ui::show_file_context_menu,

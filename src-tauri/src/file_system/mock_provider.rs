@@ -40,6 +40,7 @@ impl MockFileSystemProvider {
                     } else {
                         "ext:txt".to_string()
                     },
+                    extended_metadata_loaded: true,
                 }
             })
             .collect();

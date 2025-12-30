@@ -13,7 +13,7 @@ use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-use super::operations::{FileEntry, list_directory};
+use super::operations::{FileEntry, list_directory_core};
 
 /// Debounce duration in milliseconds
 const DEBOUNCE_MS: u64 = 200;
@@ -146,8 +146,8 @@ fn handle_directory_change(session_id: &str) {
         (watch.path.clone(), watch.entries.clone(), manager.app_handle.clone())
     };
 
-    // Re-read the directory
-    let new_entries = match list_directory(&path) {
+    // Re-read the directory using core metadata (extended metadata not needed for diffs)
+    let new_entries = match list_directory_core(&path) {
         Ok(entries) => entries,
         Err(e) => {
             eprintln!("[WATCHER] Failed to re-read directory: {}", e);
@@ -264,6 +264,7 @@ mod tests {
             owner: "user".to_string(),
             group: "group".to_string(),
             icon_id: "ext:txt".to_string(),
+            extended_metadata_loaded: true,
         }
     }
 
