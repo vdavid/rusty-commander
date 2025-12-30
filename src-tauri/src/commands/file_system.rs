@@ -77,6 +77,19 @@ pub fn get_extended_metadata(paths: Vec<String>) -> Vec<ExtendedMetadata> {
     get_extended_metadata_batch(paths)
 }
 
+// ============================================================================
+// Benchmarking support
+// ============================================================================
+
+/// Logs a frontend benchmark event to stderr (unified timeline with Rust events).
+/// Only logs if RUSTY_COMMANDER_BENCHMARK=1 is set.
+#[tauri::command]
+pub fn benchmark_log(message: String) {
+    if crate::benchmark::is_enabled() {
+        eprintln!("{}", message);
+    }
+}
+
 /// Expands tilde (~) to the user's home directory.
 fn expand_tilde(path: &str) -> String {
     if (path.starts_with("~/") || path == "~")

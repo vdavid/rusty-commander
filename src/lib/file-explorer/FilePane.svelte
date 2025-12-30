@@ -19,6 +19,7 @@
     import SelectionInfo from './SelectionInfo.svelte'
     import LoadingIcon from '../LoadingIcon.svelte'
     import { createFileDataStore } from './FileDataStore'
+    import * as benchmark from '$lib/benchmark'
 
     /** Chunk size for loading large directories */
     const CHUNK_SIZE = 5000
@@ -114,6 +115,10 @@
     }
 
     async function loadDirectory(path: string, selectName?: string) {
+        // Reset benchmark epoch for this navigation
+        benchmark.resetEpoch()
+        benchmark.logEventValue('loadDirectory CALLED', path)
+
         // Increment generation to cancel any in-flight requests
         const thisGeneration = ++loadGeneration
 
@@ -131,7 +136,9 @@
 
         try {
             // Start session - reads directory ONCE, returns first chunk immediately
+            benchmark.logEvent('IPC listDirectoryStartSession CALL')
             const startResult = await listDirectoryStartSession(path, CHUNK_SIZE)
+            benchmark.logEventValue('IPC listDirectoryStartSession RETURNED, totalCount', startResult.totalCount)
 
             // Check if this load was cancelled
             if (thisGeneration !== loadGeneration) {
@@ -148,7 +155,9 @@
             const firstChunk = parentEntry ? [parentEntry, ...startResult.entries] : startResult.entries
 
             // Display first chunk immediately via FileDataStore
+            benchmark.logEvent('fileStore.setFiles START')
             fileStore.setFiles(firstChunk)
+            benchmark.logEventValue('fileStore.setFiles END, count', firstChunk.length)
 
             // Set selection
             if (selectName) {
@@ -166,6 +175,7 @@
             }
 
             loading = false
+            benchmark.logEvent('loading = false (UI can render)')
 
             // Start icon refresh for first chunk (non-blocking)
             void refreshIconsForCurrentDirectory(firstChunk.filter((e) => e.name !== '..'))
@@ -174,11 +184,13 @@
             void fetchSyncStatusForEntries(firstChunk)
 
             // Fetch extended metadata in background (Phase 2 of two-phase loading)
+            benchmark.logEvent('fetchExtendedMetadataForEntries SCHEDULED')
             void fetchExtendedMetadataForEntries(firstChunk)
 
             // Load remaining chunks in background
             if (startResult.hasMore) {
                 loadingMore = true
+                benchmark.logEvent('loadRemainingChunksFromSession SCHEDULED')
                 void loadRemainingChunksFromSession(
                     startResult.sessionId,
                     thisGeneration,
@@ -296,11 +308,19 @@
         // Only fetch for entries that don't have extended metadata loaded
         const paths = entries.filter((e) => e.name !== '..' && !e.extendedMetadataLoaded).map((e) => e.path)
 
-        if (paths.length === 0) return
+        if (paths.length === 0) {
+            benchmark.logEvent('fetchExtendedMetadataForEntries SKIPPED (no entries need extended data)')
+            return
+        }
 
         try {
+            benchmark.logEventValue('IPC getExtendedMetadata CALL, count', paths.length)
             const extendedData = await getExtendedMetadata(paths)
+            benchmark.logEventValue('IPC getExtendedMetadata RETURNED, count', extendedData.length)
+
+            benchmark.logEvent('fileStore.mergeExtendedData START')
             fileStore.mergeExtendedData(extendedData)
+            benchmark.logEvent('fileStore.mergeExtendedData END')
         } catch {
             // Silently ignore - extended metadata is optional
         }

@@ -10,6 +10,7 @@
 use criterion as _;
 use notify as _;
 
+pub mod benchmark;
 mod commands;
 pub mod config;
 mod file_system;
@@ -45,6 +46,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            // Initialize benchmarking (enabled by RUSTY_COMMANDER_BENCHMARK=1)
+            benchmark::init_benchmarking();
+
             // Initialize the file watcher manager with app handle for events
             file_system::init_watcher_manager(app.handle().clone());
 
@@ -112,6 +116,7 @@ pub fn run() {
             commands::file_system::list_directory_end_session,
             commands::file_system::path_exists,
             commands::file_system::get_extended_metadata,
+            commands::file_system::benchmark_log,
             commands::icons::get_icons,
             commands::icons::refresh_directory_icons,
             commands::ui::show_file_context_menu,

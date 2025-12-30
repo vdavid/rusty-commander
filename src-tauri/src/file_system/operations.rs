@@ -13,6 +13,7 @@ use uuid::Uuid;
 use uzers::{get_group_by_gid, get_user_by_uid};
 
 use super::watcher::{start_watching, stop_watching};
+use crate::benchmark;
 
 /// Cache for uid→username and gid→groupname resolution.
 static OWNER_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -305,17 +306,24 @@ pub struct ChunkNextResult {
 /// # Returns
 /// A `SessionStartResult` with session ID, total count, and first chunk.
 pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionStartResult, std::io::Error> {
+    // Reset benchmark epoch for this navigation
+    benchmark::reset_epoch();
+    benchmark::log_event_value("list_directory_start CALLED", path.display());
+
     // Use list_directory_core for fast initial loading (skips macOS extended metadata)
     // Extended metadata (addedAt, openedAt) will be fetched later via get_extended_metadata
     let all_entries = list_directory_core(path)?;
     let total_count = all_entries.len();
+    benchmark::log_event_value("list_directory_core COMPLETE, entries", total_count);
 
     // Generate session ID
     let session_id = Uuid::new_v4().to_string();
 
     // Extract first chunk
+    benchmark::log_event("extract_first_chunk START");
     let first_chunk: Vec<FileEntry> = all_entries.iter().take(chunk_size).cloned().collect();
     let has_more = total_count > chunk_size;
+    benchmark::log_event_value("extract_first_chunk END, chunk_size", first_chunk.len());
 
     // Start watching the directory immediately
     // Watcher uses core metadata for diff computation (size, modifiedAt, permissions)
@@ -337,6 +345,7 @@ pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionSta
         );
     }
 
+    benchmark::log_event("list_directory_start RETURNING");
     Ok(SessionStartResult {
         session_id,
         total_count,
@@ -402,13 +411,17 @@ pub fn list_directory_end(session_id: &str) {
 /// # Returns
 /// A vector of FileEntry with `extended_metadata_loaded = false`
 pub fn list_directory_core(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
+    benchmark::log_event("list_directory_core START");
     let overall_start = std::time::Instant::now();
     let mut entries = Vec::new();
 
+    benchmark::log_event("readdir START");
     let read_start = std::time::Instant::now();
     let dir_entries: Vec<_> = fs::read_dir(path)?.collect();
     let read_dir_time = read_start.elapsed();
+    benchmark::log_event_value("readdir END, count", dir_entries.len());
 
+    benchmark::log_event("stat_loop START");
     let mut metadata_time = std::time::Duration::ZERO;
     let mut owner_lookup_time = std::time::Duration::ZERO;
 
@@ -503,13 +516,16 @@ pub fn list_directory_core(path: &Path) -> Result<Vec<FileEntry>, std::io::Error
             }
         }
     }
+    benchmark::log_event_value("stat_loop END, entries", entries.len());
 
     // Sort: directories first, then files, both alphabetically
+    benchmark::log_event("sort START");
     entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
+    benchmark::log_event("sort END");
 
     let total_time = overall_start.elapsed();
     eprintln!(
@@ -521,6 +537,7 @@ pub fn list_directory_core(path: &Path) -> Result<Vec<FileEntry>, std::io::Error
         owner_lookup_time.as_millis(),
         total_time.as_millis()
     );
+    benchmark::log_event("list_directory_core END");
 
     Ok(entries)
 }
@@ -551,7 +568,8 @@ pub struct ExtendedMetadata {
 pub fn get_extended_metadata_batch(paths: Vec<String>) -> Vec<ExtendedMetadata> {
     use std::path::Path;
 
-    paths
+    benchmark::log_event_value("get_extended_metadata_batch START, count", paths.len());
+    let result: Vec<ExtendedMetadata> = paths
         .into_iter()
         .map(|path_str| {
             let path = Path::new(&path_str);
@@ -562,11 +580,14 @@ pub fn get_extended_metadata_batch(paths: Vec<String>) -> Vec<ExtendedMetadata> 
                 opened_at: macos_meta.opened_at,
             }
         })
-        .collect()
+        .collect();
+    benchmark::log_event_value("get_extended_metadata_batch END, count", result.len());
+    result
 }
 
 #[cfg(not(target_os = "macos"))]
 pub fn get_extended_metadata_batch(paths: Vec<String>) -> Vec<ExtendedMetadata> {
+    benchmark::log_event_value("get_extended_metadata_batch (non-macOS), count", paths.len());
     // On non-macOS, there's no extended metadata to fetch
     paths
         .into_iter()
