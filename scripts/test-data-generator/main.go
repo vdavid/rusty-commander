@@ -15,10 +15,12 @@ import (
 
 // Target file counts for each folder
 var targets = map[string]int{
-	"folder with 1000 files":  1000,
-	"folder with 5000 files":  5000,
-	"folder with 20000 files": 20000,
-	"folder with 50000 files": 50000,
+	"folder with 1000 files":   1000,
+	"folder with 5000 files":   5000,
+	"folder with 20000 files":  20000,
+	"folder with 50000 files":  50000,
+	"folder with 100000 files": 100000,
+	"folder with 200000 files": 200000,
 }
 
 // Word lists for sentence generation - picked for maximum entertainment value
