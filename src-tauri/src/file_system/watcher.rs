@@ -36,8 +36,8 @@ pub struct DiffChange {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DirectoryDiff {
-    /// Session ID this diff belongs to
-    pub session_id: String,
+    /// Listing ID this diff belongs to
+    pub listing_id: String,
     /// Monotonic sequence number
     pub sequence: u64,
     /// List of changes
@@ -182,7 +182,7 @@ fn handle_directory_change(session_id: &str) {
     // Emit event to frontend
     if let Some(app) = app_handle {
         let diff = DirectoryDiff {
-            session_id: session_id.to_string(),
+            listing_id: session_id.to_string(),
             sequence,
             changes,
         };

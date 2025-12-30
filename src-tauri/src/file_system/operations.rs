@@ -19,17 +19,15 @@ use crate::benchmark;
 static OWNER_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 static GROUP_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// Cache for directory listing sessions (cursor-based pagination).
-/// Key: session_id, Value: cached directory with cursor position.
-static SESSION_CACHE: LazyLock<RwLock<HashMap<String, CachedDirectory>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// Cache for directory listings (on-demand virtual scrolling).
+/// Key: listing_id, Value: cached listing with all entries.
+static LISTING_CACHE: LazyLock<RwLock<HashMap<String, CachedListing>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// Cached directory entries for cursor-based pagination.
-struct CachedDirectory {
+/// Cached directory listing for on-demand virtual scrolling.
+struct CachedListing {
     path: std::path::PathBuf,
     entries: Vec<FileEntry>,
-    cursor: usize,
-    // No created_at - sessions are eternal until explicitly ended
+    // No cursor - frontend fetches by range on demand
 }
 
 /// Resolves a uid to a username, with caching.
@@ -266,131 +264,189 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
 }
 
 // ============================================================================
-// Cursor-based pagination API (session-based, reads directory only once)
+// On-demand virtual scrolling API (listing-based, fetch by range)
 // ============================================================================
 
-/// Result of starting a new directory listing session.
+/// Result of starting a new directory listing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionStartResult {
-    /// Unique session ID for subsequent next/end calls
-    pub session_id: String,
+pub struct ListingStartResult {
+    /// Unique listing ID for subsequent API calls
+    pub listing_id: String,
     /// Total number of entries in the directory
     pub total_count: usize,
-    /// First chunk of entries
-    pub entries: Vec<FileEntry>,
-    /// Whether there are more entries to fetch
-    pub has_more: bool,
 }
 
-/// Result of fetching the next chunk in a session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChunkNextResult {
-    /// Chunk of entries
-    pub entries: Vec<FileEntry>,
-    /// Whether there are more entries to fetch
-    pub has_more: bool,
-}
-
-/// Starts a new paginated directory listing session.
+/// Starts a new directory listing.
 ///
-/// Reads the directory once, caches it, and returns the first chunk.
-/// Use `list_directory_next` to get subsequent chunks.
-/// Call `list_directory_end` to clean up when done.
+/// Reads the directory once, caches it, and returns listing ID + total count.
+/// Frontend then fetches visible ranges on demand via `get_file_range`.
 ///
 /// # Arguments
 /// * `path` - The directory path to list
-/// * `chunk_size` - Number of entries to return in the first chunk
+/// * `include_hidden` - Whether to include hidden files in total count
 ///
 /// # Returns
-/// A `SessionStartResult` with session ID, total count, and first chunk.
-pub fn list_directory_start(path: &Path, chunk_size: usize) -> Result<SessionStartResult, std::io::Error> {
+/// A `ListingStartResult` with listing ID and total count.
+pub fn list_directory_start(path: &Path, include_hidden: bool) -> Result<ListingStartResult, std::io::Error> {
     // Reset benchmark epoch for this navigation
     benchmark::reset_epoch();
     benchmark::log_event_value("list_directory_start CALLED", path.display());
 
-    // Use list_directory_core for fast initial loading (skips macOS extended metadata)
-    // Extended metadata (addedAt, openedAt) will be fetched later via get_extended_metadata
+    // Use list_directory_core for fast loading (skips macOS extended metadata)
     let all_entries = list_directory_core(path)?;
-    let total_count = all_entries.len();
-    benchmark::log_event_value("list_directory_core COMPLETE, entries", total_count);
+    benchmark::log_event_value("list_directory_core COMPLETE, entries", all_entries.len());
 
-    // Generate session ID
-    let session_id = Uuid::new_v4().to_string();
+    // Generate listing ID
+    let listing_id = Uuid::new_v4().to_string();
 
-    // Extract first chunk
-    benchmark::log_event("extract_first_chunk START");
-    let first_chunk: Vec<FileEntry> = all_entries.iter().take(chunk_size).cloned().collect();
-    let has_more = total_count > chunk_size;
-    benchmark::log_event_value("extract_first_chunk END, chunk_size", first_chunk.len());
+    // Count visible entries based on include_hidden setting
+    let total_count = if include_hidden {
+        all_entries.len()
+    } else {
+        all_entries.iter().filter(|e| !e.name.starts_with('.')).count()
+    };
 
-    // Start watching the directory immediately
-    // Watcher uses core metadata for diff computation (size, modifiedAt, permissions)
-    // Extended metadata is not needed for detecting file changes
-    if let Err(e) = start_watching(&session_id, path, all_entries.clone()) {
-        eprintln!("[SESSION] Failed to start watcher: {}", e);
+    // Start watching the directory
+    if let Err(e) = start_watching(&listing_id, path, all_entries.clone()) {
+        eprintln!("[LISTING] Failed to start watcher: {}", e);
         // Continue anyway - watcher is optional enhancement
     }
 
-    // Cache the entries with cursor position (no expiry)
-    if let Ok(mut cache) = SESSION_CACHE.write() {
+    // Cache the entries (no cursor needed - frontend fetches by range)
+    if let Ok(mut cache) = LISTING_CACHE.write() {
         cache.insert(
-            session_id.clone(),
-            CachedDirectory {
+            listing_id.clone(),
+            CachedListing {
                 path: path.to_path_buf(),
                 entries: all_entries,
-                cursor: chunk_size.min(total_count),
             },
         );
     }
 
     benchmark::log_event("list_directory_start RETURNING");
-    Ok(SessionStartResult {
-        session_id,
+    Ok(ListingStartResult {
+        listing_id,
         total_count,
-        entries: first_chunk,
-        has_more,
     })
 }
 
-/// Gets the next chunk of entries from a cached session.
+/// Gets a range of entries from a cached listing.
 ///
 /// # Arguments
-/// * `session_id` - The session ID from `list_directory_start`
-/// * `chunk_size` - Number of entries to return
+/// * `listing_id` - The listing ID from `list_directory_start`
+/// * `start` - Start index (0-based)
+/// * `count` - Number of entries to return
+/// * `include_hidden` - Whether to include hidden files
 ///
 /// # Returns
-/// A `ChunkNextResult` with entries and has_more flag.
-pub fn list_directory_next(session_id: &str, chunk_size: usize) -> Result<ChunkNextResult, String> {
-    let mut cache = SESSION_CACHE.write().map_err(|_| "Failed to acquire cache lock")?;
+/// Vector of FileEntry for the requested range.
+pub fn get_file_range(
+    listing_id: &str,
+    start: usize,
+    count: usize,
+    include_hidden: bool,
+) -> Result<Vec<FileEntry>, String> {
+    let cache = LISTING_CACHE.read().map_err(|_| "Failed to acquire cache lock")?;
 
-    let session = cache
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session not found: {}", session_id))?;
+    let listing = cache
+        .get(listing_id)
+        .ok_or_else(|| format!("Listing not found: {}", listing_id))?;
 
-    let start = session.cursor;
-    let end = (start + chunk_size).min(session.entries.len());
-
-    let entries: Vec<FileEntry> = session.entries[start..end].to_vec();
-    session.cursor = end;
-
-    let has_more = end < session.entries.len();
-
-    Ok(ChunkNextResult { entries, has_more })
+    // Filter entries if not including hidden
+    if include_hidden {
+        let end = (start + count).min(listing.entries.len());
+        Ok(listing.entries[start..end].to_vec())
+    } else {
+        // Need to filter and then slice
+        let visible: Vec<&FileEntry> = listing.entries.iter().filter(|e| !e.name.starts_with('.')).collect();
+        let end = (start + count).min(visible.len());
+        Ok(visible[start..end].iter().cloned().cloned().collect())
+    }
 }
 
-/// Ends a directory listing session and cleans up the cache.
+/// Gets total count of entries in a cached listing.
 ///
 /// # Arguments
-/// * `session_id` - The session ID to clean up
-pub fn list_directory_end(session_id: &str) {
-    // Stop the file watcher
-    stop_watching(session_id);
+/// * `listing_id` - The listing ID from `list_directory_start`
+/// * `include_hidden` - Whether to include hidden files in count
+///
+/// # Returns
+/// Total count of (visible) entries.
+pub fn get_total_count(listing_id: &str, include_hidden: bool) -> Result<usize, String> {
+    let cache = LISTING_CACHE.read().map_err(|_| "Failed to acquire cache lock")?;
 
-    // Remove from session cache
-    if let Ok(mut cache) = SESSION_CACHE.write() {
-        cache.remove(session_id);
+    let listing = cache
+        .get(listing_id)
+        .ok_or_else(|| format!("Listing not found: {}", listing_id))?;
+
+    if include_hidden {
+        Ok(listing.entries.len())
+    } else {
+        Ok(listing.entries.iter().filter(|e| !e.name.starts_with('.')).count())
+    }
+}
+
+/// Finds the index of a file by name in a cached listing.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID from `list_directory_start`
+/// * `name` - File name to find
+/// * `include_hidden` - Whether to include hidden files when calculating index
+///
+/// # Returns
+/// Index of the file, or None if not found.
+pub fn find_file_index(listing_id: &str, name: &str, include_hidden: bool) -> Result<Option<usize>, String> {
+    let cache = LISTING_CACHE.read().map_err(|_| "Failed to acquire cache lock")?;
+
+    let listing = cache
+        .get(listing_id)
+        .ok_or_else(|| format!("Listing not found: {}", listing_id))?;
+
+    if include_hidden {
+        Ok(listing.entries.iter().position(|e| e.name == name))
+    } else {
+        // Find index in filtered list
+        let visible: Vec<&FileEntry> = listing.entries.iter().filter(|e| !e.name.starts_with('.')).collect();
+        Ok(visible.iter().position(|e| e.name == name))
+    }
+}
+
+/// Gets a single file at the given index.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID from `list_directory_start`
+/// * `index` - Index of the file to get
+/// * `include_hidden` - Whether to include hidden files when calculating index
+///
+/// # Returns
+/// FileEntry at the index, or None if out of bounds.
+pub fn get_file_at(listing_id: &str, index: usize, include_hidden: bool) -> Result<Option<FileEntry>, String> {
+    let cache = LISTING_CACHE.read().map_err(|_| "Failed to acquire cache lock")?;
+
+    let listing = cache
+        .get(listing_id)
+        .ok_or_else(|| format!("Listing not found: {}", listing_id))?;
+
+    if include_hidden {
+        Ok(listing.entries.get(index).cloned())
+    } else {
+        let visible: Vec<&FileEntry> = listing.entries.iter().filter(|e| !e.name.starts_with('.')).collect();
+        Ok(visible.get(index).cloned().cloned())
+    }
+}
+
+/// Ends a directory listing and cleans up the cache.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID to clean up
+pub fn list_directory_end(listing_id: &str) {
+    // Stop the file watcher
+    stop_watching(listing_id);
+
+    // Remove from listing cache
+    if let Ok(mut cache) = LISTING_CACHE.write() {
+        cache.remove(listing_id);
     }
 }
 

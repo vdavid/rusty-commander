@@ -6,11 +6,12 @@
         openFile,
         showFileContextMenu,
         updateMenuContext,
-        listDirectoryStartSession,
-        listDirectoryNextChunk,
-        listDirectoryEndSession,
+        listDirectoryStart,
+        listDirectoryEnd,
+        findFileIndex,
+        getFileAt,
+        getTotalCount,
         getSyncStatus,
-        getExtendedMetadata,
         type UnlistenFn,
     } from '$lib/tauri-commands'
     import type { ViewMode } from '$lib/app-status-store'
@@ -18,11 +19,7 @@
     import BriefList from './BriefList.svelte'
     import SelectionInfo from './SelectionInfo.svelte'
     import LoadingIcon from '../LoadingIcon.svelte'
-    import { createFileDataStore } from './FileDataStore'
     import * as benchmark from '$lib/benchmark'
-
-    /** Chunk size for loading large directories */
-    const CHUNK_SIZE = 5000
 
     interface Props {
         initialPath: string
@@ -44,32 +41,23 @@
 
     let currentPath = $state(untrack(() => initialPath))
 
-    // PERFORMANCE: FileDataStore keeps files outside Svelte's reactivity system
-    // to avoid O(n) reactivity costs for large directories (20k+ files).
-    // Only storeVersion is reactive - when it changes, components re-read from store.
-    const fileStore = createFileDataStore()
-    let storeVersion = $state(0)
-
-    // Subscribe to store updates
-    $effect(() => {
-        return fileStore.onUpdate(() => {
-            storeVersion++
-        })
-    })
-
+    // New architecture: store listingId and totalCount, not files
+    let listingId = $state('')
+    let totalCount = $state(0)
     let loading = $state(true)
-    let loadingMore = $state(false)
     let error = $state<string | null>(null)
     let selectedIndex = $state(0)
+
+    // Selected entry fetched separately for SelectionInfo
+    let selectedEntry = $state<FileEntry | null>(null)
+
+    // Component refs for keyboard navigation
     let fullListRef: FullList | undefined = $state()
     let briefListRef: BriefList | undefined = $state()
-    /** Metadata for the current directory (used for ".." entry in SelectionInfo) */
-    const currentDirModifiedAt = $state<number | undefined>(undefined)
 
     // Track the current load operation to cancel outdated ones
     let loadGeneration = 0
-    // Track current session for file watching
-    let currentSessionId = ''
+    // Track last sequence for file watcher diffs
     let lastSequence = 0
     let unlisten: UnlistenFn | undefined
     let unlistenMenuAction: UnlistenFn | undefined
@@ -77,25 +65,11 @@
     let syncPollInterval: ReturnType<typeof setInterval> | undefined
     const SYNC_POLL_INTERVAL_MS = 2000 // Poll every 2 seconds
 
-    // Note: totalCount and maxFilenameWidth are available via fileStore.totalCount
-    // and fileStore.maxFilenameWidth - they'll be passed to List components in Phase 2
+    // Sync status map for visible files
+    let syncStatusMap = $state<Record<string, SyncStatus>>({})
 
-    // Derive syncStatusMap from store (reactive via storeVersion)
-    const syncStatusMap = $derived.by(() => {
-        void storeVersion
-        return fileStore.syncStatusMap as Record<string, SyncStatus>
-    })
-
-    // Get all visible files from store
-    // Note: This is used for operations that need the full list (keyboard nav, context menu)
-    // Virtual scroll components should use getRange() instead
-    const files = $derived.by(() => {
-        void storeVersion
-        return fileStore.getAllFiltered()
-    })
-
-    // Currently selected entry for SelectionInfo (must be after files declaration)
-    const selectedEntry = $derived(files[selectedIndex])
+    // Derive includeHidden from showHiddenFiles prop
+    const includeHidden = $derived(showHiddenFiles)
 
     // Create ".." entry for parent navigation
     function createParentEntry(path: string): FileEntry | null {
@@ -110,9 +84,15 @@
             owner: '',
             group: '',
             iconId: 'dir',
-            extendedMetadataLoaded: true, // Parent entry doesn't need extended metadata
+            extendedMetadataLoaded: true,
         }
     }
+
+    // Check if current directory has a parent
+    const hasParent = $derived(currentPath !== '/')
+
+    // Effective total count includes ".." entry if not at root
+    const effectiveTotalCount = $derived(hasParent ? totalCount + 1 : totalCount)
 
     async function loadDirectory(path: string, selectName?: string) {
         // Reset benchmark epoch for this navigation
@@ -122,54 +102,42 @@
         // Increment generation to cancel any in-flight requests
         const thisGeneration = ++loadGeneration
 
-        // End previous session (and watcher) when navigating away
-        if (currentSessionId) {
-            void listDirectoryEndSession(currentSessionId)
-            currentSessionId = ''
+        // End previous listing when navigating away
+        if (listingId) {
+            void listDirectoryEnd(listingId)
+            listingId = ''
             lastSequence = 0
         }
 
         loading = true
-        loadingMore = false
         error = null
-        fileStore.clear() // Reset store on directory change
+        syncStatusMap = {}
 
         try {
-            // Start session - reads directory ONCE, returns first chunk immediately
-            benchmark.logEvent('IPC listDirectoryStartSession CALL')
-            const startResult = await listDirectoryStartSession(path, CHUNK_SIZE)
-            benchmark.logEventValue('IPC listDirectoryStartSession RETURNED, totalCount', startResult.totalCount)
+            // Start listing - returns just listingId and totalCount (no entries!)
+            benchmark.logEvent('IPC listDirectoryStart CALL')
+            const result = await listDirectoryStart(path, includeHidden)
+            benchmark.logEventValue('IPC listDirectoryStart RETURNED, totalCount', result.totalCount)
 
             // Check if this load was cancelled
             if (thisGeneration !== loadGeneration) {
-                // Clean up abandoned session
-                void listDirectoryEndSession(startResult.sessionId)
+                // Clean up abandoned listing
+                void listDirectoryEnd(result.listingId)
                 return
             }
 
-            // Store session ID for file watching events
-            currentSessionId = startResult.sessionId
+            // Store listing info
+            listingId = result.listingId
+            totalCount = result.totalCount
             lastSequence = 0
 
-            const parentEntry = createParentEntry(path)
-            const firstChunk = parentEntry ? [parentEntry, ...startResult.entries] : startResult.entries
-
-            // Display first chunk immediately via FileDataStore
-            benchmark.logEvent('fileStore.setFiles START')
-            fileStore.setFiles(firstChunk)
-            benchmark.logEventValue('fileStore.setFiles END, count', firstChunk.length)
-
-            // Set selection
+            // Determine initial selection
             if (selectName) {
-                const targetIndex = fileStore.findIndex(selectName)
-                selectedIndex = targetIndex >= 0 ? targetIndex : 0
-
-                // Scroll the selected folder into view (after DOM updates)
-                void tick().then(() => {
-                    const listRef = viewMode === 'brief' ? briefListRef : fullListRef
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-                    listRef?.scrollToIndex(selectedIndex)
-                })
+                // Find the index of the folder we came from
+                const foundIndex = await findFileIndex(listingId, selectName, includeHidden)
+                // Account for ".." entry at index 0 if present
+                const adjustedIndex = hasParent ? (foundIndex ?? -1) + 1 : (foundIndex ?? 0)
+                selectedIndex = adjustedIndex >= 0 ? adjustedIndex : 0
             } else {
                 selectedIndex = 0
             }
@@ -177,158 +145,64 @@
             loading = false
             benchmark.logEvent('loading = false (UI can render)')
 
-            // Start icon refresh for first chunk (non-blocking)
-            void refreshIconsForCurrentDirectory(firstChunk.filter((e) => e.name !== '..'))
+            // Fetch selected entry for SelectionInfo
+            void fetchSelectedEntry()
 
-            // Fetch sync status for visible files (non-blocking)
-            void fetchSyncStatusForEntries(firstChunk)
-
-            // Fetch extended metadata in background (Phase 2 of two-phase loading)
-            benchmark.logEvent('fetchExtendedMetadataForEntries SCHEDULED')
-            void fetchExtendedMetadataForEntries(firstChunk)
-
-            // Load remaining chunks in background
-            if (startResult.hasMore) {
-                loadingMore = true
-                benchmark.logEvent('loadRemainingChunksFromSession SCHEDULED')
-                void loadRemainingChunksFromSession(
-                    startResult.sessionId,
-                    thisGeneration,
-                    listDirectoryNextChunk,
-                    listDirectoryEndSession,
-                )
-            }
+            // Scroll to selection after DOM updates
+            void tick().then(() => {
+                const listRef = viewMode === 'brief' ? briefListRef : fullListRef
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                listRef?.scrollToIndex(selectedIndex)
+            })
         } catch (e) {
             if (thisGeneration !== loadGeneration) return
             error = e instanceof Error ? e.message : String(e)
-            fileStore.clear()
+            listingId = ''
+            totalCount = 0
             loading = false
-            currentSessionId = ''
-            lastSequence = 0
         }
     }
 
-    /**
-     * Apply a diff from the file watcher to the file list.
-     * Uses FileDataStore's applyDiff method which handles internal state updates.
-     */
-    function applyDiffToList(changes: { type: 'add' | 'remove' | 'modify'; entry: FileEntry }[]) {
-        selectedIndex = fileStore.applyDiff(changes, selectedIndex)
-    }
-
-    /**
-     * Loads remaining chunks from a session in the background.
-     * Uses requestAnimationFrame to avoid blocking the UI.
-     */
-    async function loadRemainingChunksFromSession(
-        sessionId: string,
-        generation: number,
-        nextChunk: (id: string, size: number) => Promise<{ entries: FileEntry[]; hasMore: boolean }>,
-        endSession: (id: string) => Promise<void>,
-    ) {
-        let hasMore = true
-
-        while (hasMore) {
-            // Check if cancelled
-            if (generation !== loadGeneration) {
-                void endSession(sessionId)
-                return
-            }
-
-            // Wait for next animation frame to keep UI responsive
-            await new Promise((resolve) => requestAnimationFrame(resolve))
-
-            // Check again after await
-            if (generation !== loadGeneration) {
-                void endSession(sessionId)
-                return
-            }
-
-            // Fetch next chunk from cache (fast!)
-            const result = await nextChunk(sessionId, CHUNK_SIZE)
-            hasMore = result.hasMore
-
-            // Append entries to store
-            fileStore.appendFiles(result.entries)
-
-            // Refresh icons for new entries
-            void refreshIconsForCurrentDirectory(result.entries.filter((e) => e.name !== '..'))
+    // Fetch the currently selected entry for SelectionInfo
+    async function fetchSelectedEntry() {
+        if (!listingId) {
+            selectedEntry = null
+            return
         }
 
-        loadingMore = false
-        // Session stays active for file watching - only end when navigating away
-    }
-
-    // Refresh icons for directories (custom folder icons) and extensions (file association changes)
-    async function refreshIconsForCurrentDirectory(entries: FileEntry[]) {
-        // Use static import since knip doesn't detect dynamic imports
-        const { refreshDirectoryIcons } = await import('$lib/icon-cache')
-
-        // Collect all directory paths (for custom folder icons)
-        const directoryPaths = entries.filter((e) => e.isDirectory).map((e) => e.path)
-
-        // Collect all unique extensions (for file association changes)
-        // eslint-disable-next-line svelte/prefer-svelte-reactivity
-        const extensionSet = new Set<string>()
-        for (const entry of entries) {
-            if (!entry.isDirectory && entry.name.includes('.')) {
-                const ext = entry.name.split('.').pop()
-                if (ext) extensionSet.add(ext.toLowerCase())
-            }
+        // Handle ".." entry specially
+        if (hasParent && selectedIndex === 0) {
+            selectedEntry = createParentEntry(currentPath)
+            return
         }
 
-        await refreshDirectoryIcons(directoryPaths, [...extensionSet])
+        // Adjust index for ".." entry
+        const backendIndex = hasParent ? selectedIndex - 1 : selectedIndex
+
+        try {
+            const entry = await getFileAt(listingId, backendIndex, includeHidden)
+            selectedEntry = entry
+        } catch {
+            selectedEntry = null
+        }
     }
 
-    /**
-     * Fetch sync status for entries in the current directory.
-     * Called lazily after directory loads to avoid blocking the UI.
-     */
-    async function fetchSyncStatusForEntries(entries: FileEntry[]) {
-        // Fetch for both files and directories (but not "..")
-        const paths = entries.filter((e) => e.name !== '..').map((e) => e.path)
-
+    // Fetch sync status for visible entries (called by List components)
+    async function fetchSyncStatusForPaths(paths: string[]) {
         if (paths.length === 0) return
 
         try {
             const statuses = await getSyncStatus(paths)
-            // Merge with existing map in store
-            fileStore.setSyncStatusMap({ ...fileStore.syncStatusMap, ...statuses })
+            syncStatusMap = { ...syncStatusMap, ...statuses }
         } catch {
             // Silently ignore - sync status is optional
-        }
-    }
-
-    /**
-     * Fetch extended metadata (addedAt, openedAt) for entries.
-     * Called after initial directory load to populate macOS-specific metadata.
-     * This is Phase 2 of two-phase metadata loading.
-     */
-    async function fetchExtendedMetadataForEntries(entries: FileEntry[]) {
-        // Only fetch for entries that don't have extended metadata loaded
-        const paths = entries.filter((e) => e.name !== '..' && !e.extendedMetadataLoaded).map((e) => e.path)
-
-        if (paths.length === 0) {
-            benchmark.logEvent('fetchExtendedMetadataForEntries SKIPPED (no entries need extended data)')
-            return
-        }
-
-        try {
-            benchmark.logEventValue('IPC getExtendedMetadata CALL, count', paths.length)
-            const extendedData = await getExtendedMetadata(paths)
-            benchmark.logEventValue('IPC getExtendedMetadata RETURNED, count', extendedData.length)
-
-            benchmark.logEvent('fileStore.mergeExtendedData START')
-            fileStore.mergeExtendedData(extendedData)
-            benchmark.logEvent('fileStore.mergeExtendedData END')
-        } catch {
-            // Silently ignore - extended metadata is optional
         }
     }
 
     function handleSelect(index: number) {
         selectedIndex = index
         onRequestFocus?.()
+        void fetchSelectedEntry()
     }
 
     async function handleContextMenu(entry: FileEntry) {
@@ -361,24 +235,29 @@
 
     // Exported so DualPaneExplorer can forward keyboard events
     export function handleKeyDown(e: KeyboardEvent) {
-        // Handle navigation keys (Enter, Backspace) the same for both modes
+        // Handle navigation keys (Enter, Backspace)
         if (e.key === 'Enter') {
             e.preventDefault()
-            void handleNavigate(files[selectedIndex])
+            // Need to get the selected entry to navigate
+            if (selectedEntry) {
+                void handleNavigate(selectedEntry)
+            }
             return
         }
         if (e.key === 'Backspace') {
             e.preventDefault()
-            const parentEntry = files.find((f) => f.name === '..')
-            if (parentEntry) {
-                void handleNavigate(parentEntry)
+            if (hasParent) {
+                const parentEntry = createParentEntry(currentPath)
+                if (parentEntry) {
+                    void handleNavigate(parentEntry)
+                }
             }
             return
         }
 
         // Handle arrow keys based on view mode
         if (viewMode === 'brief') {
-            // BriefList handles all arrow keys (Up/Down for prev/next, Left/Right for columns)
+            // BriefList handles all arrow keys
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
             const newIndex: number | undefined = briefListRef?.handleKeyNavigation(e.key)
             if (newIndex !== undefined) {
@@ -386,29 +265,40 @@
                 selectedIndex = newIndex
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                 briefListRef?.scrollToIndex(newIndex)
+                void fetchSelectedEntry()
             }
         } else {
             // Full mode: only Up/Down navigate
             if (e.key === 'ArrowDown') {
                 e.preventDefault()
-                const newIndex = Math.min(selectedIndex + 1, files.length - 1)
+                const newIndex = Math.min(selectedIndex + 1, effectiveTotalCount - 1)
                 selectedIndex = newIndex
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                 fullListRef?.scrollToIndex(newIndex)
+                void fetchSelectedEntry()
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault()
                 const newIndex = Math.max(selectedIndex - 1, 0)
                 selectedIndex = newIndex
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
                 fullListRef?.scrollToIndex(newIndex)
+                void fetchSelectedEntry()
             }
         }
-        // Tab key bubbles up to DualPaneExplorer
     }
 
-    // Sync showHiddenFiles prop with store
+    // When includeHidden changes, refetch total count
     $effect(() => {
-        fileStore.setShowHiddenFiles(showHiddenFiles)
+        if (listingId && !loading) {
+            void getTotalCount(listingId, includeHidden).then((count) => {
+                totalCount = count
+                // Reset selection if out of bounds
+                if (selectedIndex >= effectiveTotalCount) {
+                    selectedIndex = 0
+                    void fetchSelectedEntry()
+                }
+            })
+        }
     })
 
     // Update path when initialPath prop changes (for persistence loading)
@@ -422,30 +312,22 @@
     // Update global menu context when selection or focus changes
     $effect(() => {
         if (!isFocused) return
-
-        const entry = files[selectedIndex] as FileEntry | undefined
-        if (entry && entry.name !== '..') {
-            void updateMenuContext(entry.path, entry.name)
+        if (selectedEntry && selectedEntry.name !== '..') {
+            void updateMenuContext(selectedEntry.path, selectedEntry.name)
         }
     })
 
-    // Reset selection when showHiddenFiles changes and current selection becomes invalid
+    // Re-fetch selected entry when selectedIndex changes
     $effect(() => {
-        // Re-run when files change (which depends on showHiddenFiles)
-        if (selectedIndex >= files.length && files.length > 0) {
-            selectedIndex = 0
-
-            const listRef = viewMode === 'brief' ? briefListRef : fullListRef
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            listRef?.scrollToIndex(0)
+        void selectedIndex // Track
+        if (listingId && !loading) {
+            void fetchSelectedEntry()
         }
     })
 
     // Scroll selected item into view when view mode changes
     $effect(() => {
-        // Track viewMode to trigger on change
         void viewMode
-        // Wait for the new list component to mount and render
         void tick().then(() => {
             const listRef = viewMode === 'brief' ? briefListRef : fullListRef
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call
@@ -453,89 +335,69 @@
         })
     })
 
-    onMount(async () => {
-        // Listen for directory diff events from the file watcher
-        // Wrapped in try-catch to handle test environments where Tauri isn't available
-        try {
-            unlisten = await listen<DirectoryDiff>('directory-diff', (event) => {
-                const diff = event.payload
-                // Only process diffs for our current session
-                if (diff.sessionId !== currentSessionId) return
+    // Listen for file watcher diff events
+    $effect(() => {
+        void listen<DirectoryDiff>('directory-diff', (event) => {
+            const diff = event.payload
+            // Only process diffs for our current listing
+            if (diff.listingId !== listingId) return
 
-                // Check sequence - if we missed events, do full reload
-                if (diff.sequence !== lastSequence + 1) {
-                    // eslint-disable-next-line no-console
-                    console.warn('[FilePane] Sequence gap detected, reloading directory')
-                    void loadDirectory(currentPath)
-                    return
-                }
+            // Ignore out-of-order events
+            if (diff.sequence <= lastSequence) return
+            lastSequence = diff.sequence
 
-                // Apply the diff
-                lastSequence = diff.sequence
-                applyDiffToList(diff.changes)
-
-                // Get all added and modified entries for icon and sync status refresh
-                const changedEntries = diff.changes
-                    .filter((c) => c.type === 'add' || c.type === 'modify')
-                    .map((c) => c.entry)
-
-                if (changedEntries.length > 0) {
-                    // Refresh icons for new/modified entries
-                    void refreshIconsForCurrentDirectory(changedEntries)
-                    // Refresh sync status for changed entries
-                    void fetchSyncStatusForEntries(changedEntries)
-                }
+            // For now, just refetch total count - the List components
+            // will refetch their visible range on the next render
+            void getTotalCount(listingId, includeHidden).then((count) => {
+                totalCount = count
+                // Re-fetch selected entry as it may have changed
+                void fetchSelectedEntry()
             })
-        } catch {
-            // In test environment, Tauri API may not be available
-        }
-
-        // Listen for menu actions from Rust
-        try {
-            unlistenMenuAction = await listen<{ action: string; path: string }>('menu-action', (event) => {
-                if (isFocused && event.payload.action === 'get-info') {
-                    if (selectedEntry.path === event.payload.path) {
-                        // Show info in a simple way for now
-                        const size = selectedEntry.size !== undefined ? selectedEntry.size.toString() : 'N/A'
-                        const perms = selectedEntry.permissions.toString(8)
-                        alert(
-                            `Get info for: ${selectedEntry.name}\nPath: ${selectedEntry.path}\nSize: ${size} bytes\nOwner: ${selectedEntry.owner}\nPermissions: ${perms}`,
-                        )
-                    }
-                }
+        })
+            .then((unsub) => {
+                unlisten = unsub
             })
-        } catch {
-            // In test environment, Tauri API may not be available
-        }
+            .catch(() => {
+                // Ignore - file watching is optional enhancement
+            })
 
+        return () => {
+            unlisten?.()
+        }
+    })
+
+    // Listen for menu action events
+    $effect(() => {
+        void listen<string>('menu-action', (event) => {
+            const action = event.payload
+            if (action === 'open' && selectedEntry) {
+                void handleNavigate(selectedEntry)
+            }
+        })
+            .then((unsub) => {
+                unlistenMenuAction = unsub
+            })
+            .catch(() => {})
+
+        return () => {
+            unlistenMenuAction?.()
+        }
+    })
+
+    onMount(() => {
         void loadDirectory(currentPath)
 
-        // Start polling visible files for sync status changes
-        // Always poll - both panes are visible even when not focused
+        // Set up sync status polling for visible files
         syncPollInterval = setInterval(() => {
-            const listRef = viewMode === 'brief' ? briefListRef : fullListRef
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-            const visiblePaths: string[] = listRef?.getVisiblePaths?.() ?? []
-            if (visiblePaths.length > 0) {
-                void getSyncStatus(visiblePaths).then((statuses) => {
-                    // Only update if statuses actually changed
-                    const currentMap = fileStore.syncStatusMap
-                    let changed = false
-                    for (const [path, status] of Object.entries(statuses)) {
-                        if (currentMap[path] !== status) {
-                            changed = true
-                            break
-                        }
-                    }
-                    if (changed) {
-                        fileStore.setSyncStatusMap({ ...currentMap, ...statuses })
-                    }
-                })
-            }
+            // List components will call fetchSyncStatusForPaths with their visible entries
         }, SYNC_POLL_INTERVAL_MS)
     })
 
     onDestroy(() => {
+        // Clean up listing
+        if (listingId) {
+            void listDirectoryEnd(listingId)
+        }
         unlisten?.()
         unlistenMenuAction?.()
         if (syncPollInterval) {
@@ -564,33 +426,40 @@
         {:else if viewMode === 'brief'}
             <BriefList
                 bind:this={briefListRef}
-                {files}
+                {listingId}
+                totalCount={effectiveTotalCount}
+                {includeHidden}
                 {selectedIndex}
                 {isFocused}
                 {syncStatusMap}
+                {hasParent}
+                parentPath={hasParent ? currentPath.substring(0, currentPath.lastIndexOf('/')) || '/' : ''}
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
                 onContextMenu={handleContextMenu}
+                onSyncStatusRequest={fetchSyncStatusForPaths}
             />
         {:else}
             <FullList
                 bind:this={fullListRef}
-                {files}
+                {listingId}
+                totalCount={effectiveTotalCount}
+                {includeHidden}
                 {selectedIndex}
                 {isFocused}
                 {syncStatusMap}
+                {hasParent}
+                parentPath={hasParent ? currentPath.substring(0, currentPath.lastIndexOf('/')) || '/' : ''}
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
                 onContextMenu={handleContextMenu}
+                onSyncStatusRequest={fetchSyncStatusForPaths}
             />
         {/if}
-        {#if loadingMore}
-            <div class="loading-more">Loading more files...</div>
-        {/if}
     </div>
-    <!-- SelectionInfo shown in brief mode (full mode will have inline metadata in the future) -->
+    <!-- SelectionInfo shown in brief mode -->
     {#if viewMode === 'brief'}
-        <SelectionInfo entry={selectedEntry} {currentDirModifiedAt} />
+        <SelectionInfo entry={selectedEntry} currentDirModifiedAt={undefined} />
     {/if}
 </div>
 
@@ -633,14 +502,5 @@
         color: var(--color-error);
         text-align: center;
         padding: var(--spacing-md);
-    }
-
-    .loading-more {
-        padding: var(--spacing-sm);
-        text-align: center;
-        font-size: var(--font-size-xs);
-        color: var(--color-text-secondary);
-        background-color: var(--color-bg-secondary);
-        border-top: 1px solid var(--color-border-primary);
     }
 </style>

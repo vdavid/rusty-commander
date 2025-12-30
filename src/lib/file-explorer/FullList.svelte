@@ -2,26 +2,45 @@
     import type { FileEntry, SyncStatus } from './types'
     import { getCachedIcon, prefetchIcons, iconCacheVersion } from '$lib/icon-cache'
     import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
+    import { getFileRange } from '$lib/tauri-commands'
+
+    /** Prefetch buffer - load this many items around visible range */
+    const PREFETCH_BUFFER = 200
 
     interface Props {
-        files: FileEntry[]
+        listingId: string
+        totalCount: number
+        includeHidden: boolean
         selectedIndex: number
         isFocused?: boolean
         syncStatusMap?: Record<string, SyncStatus>
+        hasParent: boolean
+        parentPath: string
         onSelect: (index: number) => void
         onNavigate: (entry: FileEntry) => void
         onContextMenu?: (entry: FileEntry) => void
+        onSyncStatusRequest?: (paths: string[]) => void
     }
 
     const {
-        files,
+        listingId,
+        totalCount,
+        includeHidden,
         selectedIndex,
         isFocused = true,
         syncStatusMap = {},
+        hasParent,
+        parentPath,
         onSelect,
         onNavigate,
         onContextMenu,
+        onSyncStatusRequest,
     }: Props = $props()
+
+    // ==== Cached entries (prefetch buffer) ====
+    let cachedEntries = $state<FileEntry[]>([])
+    let cachedRange = $state({ start: 0, end: 0 })
+    let isFetching = $state(false)
 
     // Sync status icon paths - returns undefined if no icon should be shown
     function getSyncIconPath(status: SyncStatus | undefined): string | undefined {
@@ -37,13 +56,10 @@
     }
 
     // ==== Virtual scrolling constants ====
-    // Row height in pixels - must match CSS (.file-entry height)
-    // Current CSS: padding 2px top/bottom + ~16px line height = ~20px
     const ROW_HEIGHT = 20
-    // Buffer items above/below viewport to reduce gaps during fast scrolling
     const BUFFER_SIZE = 20
 
-    // Size tier colors for digit triads (indexed: 0=bytes, 1=kB, 2=MB, 3=GB, 4=TB+)
+    // Size tier colors for digit triads
     const sizeTierClasses = ['size-bytes', 'size-kb', 'size-mb', 'size-gb', 'size-tb']
 
     // ==== Virtual scrolling state ====
@@ -59,47 +75,128 @@
             bufferSize: BUFFER_SIZE,
             containerSize: containerHeight,
             scrollOffset: scrollTop,
-            totalItems: files.length,
+            totalItems: totalCount,
         }),
     )
-    const visibleFiles = $derived(files.slice(virtualWindow.startIndex, virtualWindow.endIndex))
+
+    // Create parent entry
+    function createParentEntry(): FileEntry {
+        return {
+            name: '..',
+            path: parentPath,
+            isDirectory: true,
+            isSymlink: false,
+            permissions: 0o755,
+            owner: '',
+            group: '',
+            iconId: 'dir',
+            extendedMetadataLoaded: true,
+        }
+    }
+
+    // Get entry at global index (handling ".." entry)
+    function getEntryAt(globalIndex: number): FileEntry | undefined {
+        if (hasParent && globalIndex === 0) {
+            return createParentEntry()
+        }
+
+        // Backend index (without ".." entry)
+        const backendIndex = hasParent ? globalIndex - 1 : globalIndex
+
+        // Find in cached entries
+        if (backendIndex >= cachedRange.start && backendIndex < cachedRange.end) {
+            return cachedEntries[backendIndex - cachedRange.start]
+        }
+
+        return undefined
+    }
+
+    // Fetch entries for the visible range
+    async function fetchVisibleRange() {
+        if (!listingId || isFetching) return
+
+        // Calculate which backend indices we need
+        let startItem = virtualWindow.startIndex
+        let endItem = virtualWindow.endIndex
+
+        // Account for ".." entry
+        if (hasParent) {
+            startItem = Math.max(0, startItem - 1)
+            endItem = Math.max(0, endItem - 1)
+        }
+
+        // Add prefetch buffer
+        const fetchStart = Math.max(0, startItem - PREFETCH_BUFFER / 2)
+        const fetchEnd = Math.min(hasParent ? totalCount - 1 : totalCount, endItem + PREFETCH_BUFFER / 2)
+
+        // Only fetch if needed range isn't cached
+        if (fetchStart >= cachedRange.start && fetchEnd <= cachedRange.end) {
+            return // Already cached
+        }
+
+        isFetching = true
+        try {
+            const entries = await getFileRange(listingId, fetchStart, fetchEnd - fetchStart, includeHidden)
+            cachedEntries = entries
+            cachedRange = { start: fetchStart, end: fetchStart + entries.length }
+
+            // Prefetch icons for visible entries
+            const iconIds = entries.map((e) => e.iconId).filter((id) => id)
+            void prefetchIcons(iconIds)
+
+            // Request sync status for visible paths
+            const paths = entries.map((e) => e.path)
+            onSyncStatusRequest?.(paths)
+        } catch {
+            // Silently ignore fetch errors
+        } finally {
+            isFetching = false
+        }
+    }
+
+    // Get visible files for rendering
+    // Note: We read cachedEntries/cachedRange here to establish reactive dependency
+    const visibleFiles = $derived.by(() => {
+        // MUST read reactive state to establish dependency tracking
+        // Create local copies so the derived re-runs when these change
+        const entries = [...cachedEntries] // Spread to read all elements
+        const rangeStart = cachedRange.start
+        const rangeEnd = cachedRange.end
+
+        const files: { file: FileEntry; globalIndex: number }[] = []
+        for (let i = virtualWindow.startIndex; i < virtualWindow.endIndex; i++) {
+            // Inline getEntryAt logic to use local variables
+            let entry: FileEntry | undefined
+            if (hasParent && i === 0) {
+                entry = createParentEntry()
+            } else {
+                const backendIndex = hasParent ? i - 1 : i
+                if (backendIndex >= rangeStart && backendIndex < rangeEnd) {
+                    entry = entries[backendIndex - rangeStart]
+                }
+            }
+            if (entry) {
+                files.push({ file: entry, globalIndex: i })
+            }
+        }
+        return files
+    })
 
     function handleScroll(e: Event) {
         const target = e.target as HTMLDivElement
         scrollTop = target.scrollTop
+        void fetchVisibleRange()
     }
 
-    // Track which icons we've prefetched to avoid redundant calls (module-level, non-reactive)
-    // Using a plain Set outside the reactive system since we only add to it
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const prefetchedSet: Set<string> = new Set()
-
-    // Prefetch icons for visible files when they change
-    $effect(() => {
-        const newIconIds = visibleFiles.map((f) => f.iconId).filter((id) => id && !prefetchedSet.has(id))
-        if (newIconIds.length > 0) {
-            // Add to set first to avoid re-fetching during async
-            newIconIds.forEach((id) => prefetchedSet.add(id))
-            void prefetchIcons(newIconIds)
-        }
-    })
-
     // Subscribe to cache version - this makes getIconUrl reactive
-    // When iconCacheVersion updates, this derived value triggers re-render
-
     const _cacheVersion = $derived($iconCacheVersion)
 
     function getIconUrl(file: FileEntry): string | undefined {
-        // Read _cacheVersion to establish reactive dependency (it's used implicitly)
         void _cacheVersion
-
-        // For directories, try path-based icon first (for custom folder icons)
         if (file.isDirectory) {
             const pathIcon = getCachedIcon(`path:${file.path}`)
             if (pathIcon) return pathIcon
         }
-
-        // Fall back to generic icon ID
         return getCachedIcon(file.iconId)
     }
 
@@ -128,7 +225,6 @@
             tierIndex++
         }
 
-        // Add thin space separator between triads
         return triads.map((t, i) => ({
             ...t,
             value: i < triads.length - 1 ? t.value + '\u2009' : t.value,
@@ -165,35 +261,48 @@
         onSelect(actualIndex)
     }
 
-    // Keep selected item in view when container height changes (window resize)
-    $effect(() => {
-        // Track containerHeight to trigger on resize
-        if (containerHeight > 0 && scrollContainer) {
-            const newScrollTop = getScrollToPosition(selectedIndex, ROW_HEIGHT, scrollTop, containerHeight)
-            if (newScrollTop !== undefined) {
-                scrollContainer.scrollTop = newScrollTop
-            }
-        }
-    })
-
     function handleDoubleClick(actualIndex: number) {
-        onNavigate(files[actualIndex])
+        const entry = getEntryAt(actualIndex)
+        if (entry) onNavigate(entry)
     }
 
     // Exported for parent to call when arrow keys change selection
-    // noinspection JSUnusedGlobalSymbols -- it's actually used
     export function scrollToIndex(index: number) {
         if (!scrollContainer) return
-
         const newScrollTop = getScrollToPosition(index, ROW_HEIGHT, scrollTop, containerHeight)
         if (newScrollTop !== undefined) {
             scrollContainer.scrollTop = newScrollTop
         }
     }
 
+    // Track previous values to detect actual changes
+    let prevListingId = ''
+    let prevIncludeHidden = false
+
+    // Single effect: fetch when ready, reset cache only when listingId/includeHidden actually changes
+    $effect(() => {
+        // Read reactive dependencies
+        const currentListingId = listingId
+        const currentIncludeHidden = includeHidden
+        const height = containerHeight
+
+        if (!currentListingId || height <= 0) return
+
+        // Check if listingId or includeHidden actually changed
+        if (currentListingId !== prevListingId || currentIncludeHidden !== prevIncludeHidden) {
+            // Reset cache for new listing or filter change
+            cachedEntries = []
+            cachedRange = { start: 0, end: 0 }
+            prevListingId = currentListingId
+            prevIncludeHidden = currentIncludeHidden
+        }
+
+        void fetchVisibleRange()
+    })
+
     // Returns paths of currently visible files (for sync status polling)
     export function getVisiblePaths(): string[] {
-        return visibleFiles.map((f) => f.path)
+        return visibleFiles.map((f) => f.file.path)
     }
 </script>
 
@@ -205,34 +314,33 @@
     onscroll={handleScroll}
     tabindex="-1"
     role="listbox"
-    aria-activedescendant={files[selectedIndex] ? `file-${String(selectedIndex)}` : undefined}
+    aria-activedescendant={selectedIndex >= 0 ? `file-${String(selectedIndex)}` : undefined}
 >
     <!-- Spacer div provides accurate scrollbar for full list size -->
     <div class="virtual-spacer" style="height: {virtualWindow.totalSize}px;">
         <!-- Visible window positioned with translateY -->
         <div class="virtual-window" style="transform: translateY({virtualWindow.offset}px);">
-            {#each visibleFiles as file, localIndex (file.path)}
-                {@const actualIndex = virtualWindow.startIndex + localIndex}
+            {#each visibleFiles as { file, globalIndex } (file.path)}
                 {@const syncIcon = getSyncIconPath(syncStatusMap[file.path])}
                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
                 <div
-                    id={`file-${String(actualIndex)}`}
+                    id={`file-${String(globalIndex)}`}
                     class="file-entry"
                     class:is-directory={file.isDirectory}
-                    class:is-selected={actualIndex === selectedIndex}
+                    class:is-selected={globalIndex === selectedIndex}
                     onclick={() => {
-                        handleClick(actualIndex)
+                        handleClick(globalIndex)
                     }}
                     ondblclick={() => {
-                        handleDoubleClick(actualIndex)
+                        handleDoubleClick(globalIndex)
                     }}
                     oncontextmenu={(e) => {
                         e.preventDefault()
-                        onSelect(actualIndex)
-                        onContextMenu?.(files[actualIndex])
+                        onSelect(globalIndex)
+                        onContextMenu?.(file)
                     }}
                     role="option"
-                    aria-selected={actualIndex === selectedIndex}
+                    aria-selected={globalIndex === selectedIndex}
                 >
                     <span class="col-icon">
                         {#if getIconUrl(file)}
@@ -258,8 +366,8 @@
                     </span>
                     <span class="col-size" title={file.size !== undefined ? formatHumanReadable(file.size) : ''}>
                         {#if file.isDirectory}
-                            <span class="size-dir">DIR</span>
-                        {:else if file.size !== undefined && file.name !== '..'}
+                            <span class="size-dir">&lt;dir&gt;</span>
+                        {:else if file.size !== undefined}
                             {#each formatSizeTriads(file.size) as triad, i (i)}
                                 <span class={triad.tierClass}>{triad.value}</span>
                             {/each}
@@ -277,28 +385,27 @@
         margin: 0;
         padding: 0;
         overflow-y: auto;
-        font-family: var(--font-system) sans-serif;
+        overflow-x: hidden;
+        font-family: var(--font-system), sans-serif;
         font-size: var(--font-size-sm);
         flex: 1;
         outline: none;
     }
 
-    /* Virtual scrolling container - sets total height for accurate scrollbar */
     .virtual-spacer {
         position: relative;
-        width: 100%;
     }
 
-    /* Visible window - positioned with translateY for smooth scrolling */
     .virtual-window {
         will-change: transform;
     }
 
     .file-entry {
-        padding: var(--spacing-xxs) var(--spacing-sm);
-        display: flex;
-        align-items: center;
+        display: grid;
+        grid-template-columns: 24px 1fr 85px 120px;
         gap: var(--spacing-sm);
+        align-items: center;
+        padding: var(--spacing-xxs) var(--spacing-sm);
         height: 20px;
         box-sizing: border-box;
     }
@@ -311,52 +418,13 @@
         background-color: var(--color-selection-bg);
     }
 
-    /* Column layout */
     .col-icon {
         position: relative;
         width: 16px;
         height: 16px;
-        flex-shrink: 0;
-    }
-
-    .col-name {
-        flex: 1;
         display: flex;
         align-items: center;
-        gap: var(--spacing-xs);
-        overflow: hidden;
-        min-width: 0;
-    }
-
-    .name-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        flex: 1;
-        min-width: 0;
-    }
-
-    .sync-icon {
-        flex-shrink: 0;
-        opacity: 0.9;
-    }
-
-    .is-directory .col-name .name-text {
-        font-weight: 600;
-    }
-
-    .col-size {
-        flex-shrink: 0;
-        width: 90px;
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .col-date {
-        flex-shrink: 0;
-        width: 120px;
-        font-variant-numeric: tabular-nums;
-        opacity: 0.8;
+        justify-content: center;
     }
 
     .icon {
@@ -367,9 +435,6 @@
 
     .icon-emoji {
         font-size: var(--font-size-sm);
-        width: 16px;
-        text-align: center;
-        display: block;
     }
 
     .symlink-badge {
@@ -380,33 +445,64 @@
         line-height: 1;
     }
 
-    /* Size tier colors - bytes are default text color - these are used dynamically */
-    /*noinspection CssUnusedSymbol*/
+    .col-name {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        min-width: 0;
+    }
+
+    .name-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .is-directory .name-text {
+        font-weight: 600;
+    }
+
+    .sync-icon {
+        flex-shrink: 0;
+        opacity: 0.9;
+    }
+
+    .col-size {
+        text-align: right;
+        font-family: var(--font-mono, monospace);
+        font-size: var(--font-size-xs);
+    }
+
+    .size-dir {
+        color: var(--color-text-secondary);
+    }
+
     .size-bytes {
         color: var(--color-text-tertiary);
     }
-    /*noinspection CssUnusedSymbol*/
+
     .size-kb {
         color: var(--color-text-secondary);
     }
-    /*noinspection CssUnusedSymbol*/
+
     .size-mb {
         color: var(--color-text-primary);
     }
-    /*noinspection CssUnusedSymbol*/
+
     .size-gb {
-        color: var(--color-warning);
+        color: var(--color-accent);
     }
-    /*noinspection CssUnusedSymbol*/
+
     .size-tb {
         color: var(--color-error);
     }
 
-    .size-dir {
-        color: var(--color-text-tertiary);
+    .col-date {
+        font-family: var(--font-mono, monospace);
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
     }
 
-    /* Dark mode: 10% of dark selection color #0a50d0 */
     @media (prefers-color-scheme: dark) {
         .file-entry.is-selected {
             background-color: rgba(10, 80, 208, 0.1);

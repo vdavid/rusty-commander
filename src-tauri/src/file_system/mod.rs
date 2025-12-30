@@ -17,12 +17,10 @@ mod watcher;
 #[cfg(test)]
 pub use mock_provider::MockFileSystemProvider;
 pub use operations::{
-    ChunkNextResult, ExtendedMetadata, SessionStartResult, get_extended_metadata_batch, list_directory_end,
-    list_directory_next, list_directory_start,
+    ExtendedMetadata, FileEntry, ListingStartResult, find_file_index, get_extended_metadata_batch, get_file_at,
+    get_file_range, get_total_count, list_directory_end, list_directory_start,
 };
-// FileEntry re-exported for test modules (provider, mock_provider, real_provider, mock_provider_test)
-#[cfg(test)]
-pub(crate) use operations::FileEntry;
+// FileEntry also re-exported for internal test modules
 #[cfg(test)]
 pub use provider::FileSystemProvider;
 // Watcher management - init_watcher_manager must be called from lib.rs

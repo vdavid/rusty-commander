@@ -3,40 +3,77 @@
 import { invoke } from '@tauri-apps/api/core'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event'
-import type { ChunkNextResult, ExtendedMetadata, SessionStartResult, SyncStatus } from './file-explorer/types'
+import type { ExtendedMetadata, FileEntry, ListingStartResult, SyncStatus } from './file-explorer/types'
 
 export type { Event, UnlistenFn }
 export { listen }
 
 // ============================================================================
-// Cursor-based pagination API (session-based)
+// On-demand virtual scrolling API (listing-based)
 // ============================================================================
 
 /**
- * Starts a new paginated directory listing session.
- * Reads the directory once, caches on backend, returns first chunk immediately.
+ * Starts a new directory listing.
+ * Reads the directory once, caches on backend, returns listing ID + total count.
+ * Frontend then fetches visible ranges on demand via getFileRange.
  * @param path - Directory path to list. Supports tilde expansion (~).
- * @param chunkSize - Number of entries in the first chunk.
+ * @param includeHidden - Whether to include hidden files in total count.
  */
-export async function listDirectoryStartSession(path: string, chunkSize: number): Promise<SessionStartResult> {
-    return invoke<SessionStartResult>('list_directory_start_session', { path, chunkSize })
+export async function listDirectoryStart(path: string, includeHidden: boolean): Promise<ListingStartResult> {
+    return invoke<ListingStartResult>('list_directory_start', { path, includeHidden })
 }
 
 /**
- * Gets the next chunk of entries from a cached session.
- * @param sessionId - The session ID from listDirectoryStartSession.
- * @param chunkSize - Number of entries to return.
+ * Gets a range of entries from a cached listing.
+ * @param listingId - The listing ID from listDirectoryStart.
+ * @param start - Start index (0-based).
+ * @param count - Number of entries to return.
+ * @param includeHidden - Whether to include hidden files.
  */
-export async function listDirectoryNextChunk(sessionId: string, chunkSize: number): Promise<ChunkNextResult> {
-    return invoke<ChunkNextResult>('list_directory_next_chunk', { sessionId, chunkSize })
+export async function getFileRange(
+    listingId: string,
+    start: number,
+    count: number,
+    includeHidden: boolean,
+): Promise<FileEntry[]> {
+    return invoke<FileEntry[]>('get_file_range', { listingId, start, count, includeHidden })
 }
 
 /**
- * Ends a directory listing session and cleans up the cache.
- * @param sessionId - The session ID to clean up.
+ * Gets total count of entries in a cached listing.
+ * @param listingId - The listing ID from listDirectoryStart.
+ * @param includeHidden - Whether to include hidden files in count.
  */
-export async function listDirectoryEndSession(sessionId: string): Promise<void> {
-    await invoke('list_directory_end_session', { sessionId })
+export async function getTotalCount(listingId: string, includeHidden: boolean): Promise<number> {
+    return invoke<number>('get_total_count', { listingId, includeHidden })
+}
+
+/**
+ * Finds the index of a file by name in a cached listing.
+ * @param listingId - The listing ID from listDirectoryStart.
+ * @param name - File name to find.
+ * @param includeHidden - Whether to include hidden files when calculating index.
+ */
+export async function findFileIndex(listingId: string, name: string, includeHidden: boolean): Promise<number | null> {
+    return invoke<number | null>('find_file_index', { listingId, name, includeHidden })
+}
+
+/**
+ * Gets a single file at the given index.
+ * @param listingId - The listing ID from listDirectoryStart.
+ * @param index - Index of the file to get.
+ * @param includeHidden - Whether to include hidden files when calculating index.
+ */
+export async function getFileAt(listingId: string, index: number, includeHidden: boolean): Promise<FileEntry | null> {
+    return invoke<FileEntry | null>('get_file_at', { listingId, index, includeHidden })
+}
+
+/**
+ * Ends a directory listing and cleans up the cache.
+ * @param listingId - The listing ID to clean up.
+ */
+export async function listDirectoryEnd(listingId: string): Promise<void> {
+    await invoke('list_directory_end', { listingId })
 }
 
 /**

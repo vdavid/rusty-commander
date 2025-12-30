@@ -1,8 +1,9 @@
 //! Tauri commands for file system operations.
 
 use crate::file_system::{
-    ChunkNextResult, ExtendedMetadata, SessionStartResult, get_extended_metadata_batch,
-    list_directory_end as ops_list_directory_end, list_directory_next as ops_list_directory_next,
+    ExtendedMetadata, FileEntry, ListingStartResult, find_file_index as ops_find_file_index,
+    get_extended_metadata_batch, get_file_at as ops_get_file_at, get_file_range as ops_get_file_range,
+    get_total_count as ops_get_total_count, list_directory_end as ops_list_directory_end,
     list_directory_start as ops_list_directory_start,
 };
 use std::path::PathBuf;
@@ -22,43 +23,81 @@ pub fn path_exists(path: String) -> bool {
 }
 
 // ============================================================================
-// Cursor-based pagination API
+// On-demand virtual scrolling API
 // ============================================================================
 
-/// Starts a new paginated directory listing session.
+/// Starts a new directory listing.
 ///
-/// Reads the directory once, caches it, and returns the first chunk.
-/// Use `list_directory_next_chunk` to get subsequent chunks.
-/// Call `list_directory_end_session` when done.
+/// Reads the directory once, caches it, and returns listing ID + total count.
+/// Frontend then fetches visible ranges on demand via `get_file_range`.
 ///
 /// # Arguments
 /// * `path` - The directory path to list. Supports tilde expansion (~).
-/// * `chunk_size` - Number of entries in the first chunk.
+/// * `include_hidden` - Whether to include hidden files in total count.
 #[tauri::command]
-pub fn list_directory_start_session(path: String, chunk_size: usize) -> Result<SessionStartResult, String> {
+pub fn list_directory_start(path: String, include_hidden: bool) -> Result<ListingStartResult, String> {
     let expanded_path = expand_tilde(&path);
     let path_buf = PathBuf::from(&expanded_path);
-    ops_list_directory_start(&path_buf, chunk_size)
+    ops_list_directory_start(&path_buf, include_hidden)
         .map_err(|e| format!("Failed to start directory listing '{}': {}", path, e))
 }
 
-/// Gets the next chunk of entries from a cached session.
+/// Gets a range of entries from a cached listing.
 ///
 /// # Arguments
-/// * `session_id` - The session ID from `list_directory_start_session`.
-/// * `chunk_size` - Number of entries to return.
+/// * `listing_id` - The listing ID from `list_directory_start`.
+/// * `start` - Start index (0-based).
+/// * `count` - Number of entries to return.
+/// * `include_hidden` - Whether to include hidden files.
 #[tauri::command]
-pub fn list_directory_next_chunk(session_id: String, chunk_size: usize) -> Result<ChunkNextResult, String> {
-    ops_list_directory_next(&session_id, chunk_size)
+pub fn get_file_range(
+    listing_id: String,
+    start: usize,
+    count: usize,
+    include_hidden: bool,
+) -> Result<Vec<FileEntry>, String> {
+    ops_get_file_range(&listing_id, start, count, include_hidden)
 }
 
-/// Ends a directory listing session and cleans up the cache.
+/// Gets total count of entries in a cached listing.
 ///
 /// # Arguments
-/// * `session_id` - The session ID to clean up.
+/// * `listing_id` - The listing ID from `list_directory_start`.
+/// * `include_hidden` - Whether to include hidden files in count.
 #[tauri::command]
-pub fn list_directory_end_session(session_id: String) {
-    ops_list_directory_end(&session_id);
+pub fn get_total_count(listing_id: String, include_hidden: bool) -> Result<usize, String> {
+    ops_get_total_count(&listing_id, include_hidden)
+}
+
+/// Finds the index of a file by name in a cached listing.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID from `list_directory_start`.
+/// * `name` - File name to find.
+/// * `include_hidden` - Whether to include hidden files when calculating index.
+#[tauri::command]
+pub fn find_file_index(listing_id: String, name: String, include_hidden: bool) -> Result<Option<usize>, String> {
+    ops_find_file_index(&listing_id, &name, include_hidden)
+}
+
+/// Gets a single file at the given index.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID from `list_directory_start`.
+/// * `index` - Index of the file to get.
+/// * `include_hidden` - Whether to include hidden files when calculating index.
+#[tauri::command]
+pub fn get_file_at(listing_id: String, index: usize, include_hidden: bool) -> Result<Option<FileEntry>, String> {
+    ops_get_file_at(&listing_id, index, include_hidden)
+}
+
+/// Ends a directory listing and cleans up the cache.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID to clean up.
+#[tauri::command]
+pub fn list_directory_end(listing_id: String) {
+    ops_list_directory_end(&listing_id);
 }
 
 // ============================================================================

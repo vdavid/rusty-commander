@@ -35,28 +35,14 @@ export interface ExtendedMetadata {
 export type SyncStatus = 'synced' | 'online_only' | 'uploading' | 'downloading' | 'unknown'
 
 /**
- * Result of starting a new directory listing session.
- * The session caches entries on the backend for fast subsequent chunk fetches.
+ * Result of starting a new directory listing.
+ * The listing caches entries on the backend for on-demand fetching.
  */
-export interface SessionStartResult {
-    /** Unique session ID for subsequent next/end calls */
-    sessionId: string
-    /** Total number of entries in the directory */
+export interface ListingStartResult {
+    /** Unique listing ID for subsequent API calls */
+    listingId: string
+    /** Total number of visible entries in the directory */
     totalCount: number
-    /** First chunk of entries */
-    entries: FileEntry[]
-    /** Whether there are more entries to fetch */
-    hasMore: boolean
-}
-
-/**
- * Result of fetching the next chunk in a session.
- */
-export interface ChunkNextResult {
-    /** Chunk of entries */
-    entries: FileEntry[]
-    /** Whether there are more entries to fetch */
-    hasMore: boolean
 }
 
 /**
@@ -73,8 +59,8 @@ export interface DiffChange {
  * Contains changes since last update, with monotonic sequence for ordering.
  */
 export interface DirectoryDiff {
-    /** Session ID this diff belongs to */
-    sessionId: string
+    /** Listing ID this diff belongs to */
+    listingId: string
     /** Monotonic sequence number for ordering */
     sequence: number
     /** List of changes */

@@ -2,26 +2,45 @@
     import type { FileEntry, SyncStatus } from './types'
     import { getCachedIcon, prefetchIcons, iconCacheVersion } from '$lib/icon-cache'
     import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
+    import { getFileRange } from '$lib/tauri-commands'
+
+    /** Prefetch buffer - load this many items around visible range */
+    const PREFETCH_BUFFER = 200
 
     interface Props {
-        files: FileEntry[]
+        listingId: string
+        totalCount: number
+        includeHidden: boolean
         selectedIndex: number
         isFocused?: boolean
         syncStatusMap?: Record<string, SyncStatus>
+        hasParent: boolean
+        parentPath: string
         onSelect: (index: number) => void
         onNavigate: (entry: FileEntry) => void
         onContextMenu?: (entry: FileEntry) => void
+        onSyncStatusRequest?: (paths: string[]) => void
     }
 
     const {
-        files,
+        listingId,
+        totalCount,
+        includeHidden,
         selectedIndex,
         isFocused = true,
         syncStatusMap = {},
+        hasParent,
+        parentPath,
         onSelect,
         onNavigate,
         onContextMenu,
+        onSyncStatusRequest,
     }: Props = $props()
+
+    // ==== Cached entries (prefetch buffer) ====
+    let cachedEntries = $state<FileEntry[]>([])
+    let cachedRange = $state({ start: 0, end: 0 })
+    let isFetching = $state(false)
 
     // Sync status icon paths - returns undefined if no icon should be shown
     function getSyncIconPath(status: SyncStatus | undefined): string | undefined {
@@ -37,13 +56,13 @@
     }
 
     // Width of sync icon + gap (only added when sync status is available)
-    const SYNC_ICON_WIDTH = 16 // 12px icon + 4px gap
+    // const SYNC_ICON_WIDTH = 16 // 12px icon + 4px gap (unused for now)
 
     // ==== Layout constants ====
     const ROW_HEIGHT = 20
     const BUFFER_COLUMNS = 2
     const MIN_COLUMN_WIDTH = 100
-    const COLUMN_PADDING = 8 // horizontal padding inside each column
+    // const COLUMN_PADDING = 8 // horizontal padding inside each column (unused for now)
 
     // ==== Container state ====
     let scrollContainer: HTMLDivElement | undefined = $state()
@@ -55,46 +74,12 @@
     // Number of items that fit in one column
     const itemsPerColumn = $derived(Math.max(1, Math.floor(containerHeight / ROW_HEIGHT)))
 
-    // Calculate column width based on longest filename
-    // Uses a canvas to measure text width for performance
-    let measureCanvas: HTMLCanvasElement | undefined
-    function measureTextWidth(text: string, font: string): number {
-        if (!measureCanvas) {
-            measureCanvas = document.createElement('canvas')
-        }
-        const ctx = measureCanvas.getContext('2d')
-        if (!ctx) return MIN_COLUMN_WIDTH
-        ctx.font = font
-        return ctx.measureText(text).width
-    }
-
-    // Calculate max filename width - only recalculates when files change
-    const maxFilenameWidth = $derived.by(() => {
-        if (files.length === 0) return MIN_COLUMN_WIDTH
-
-        // Use system font matching CSS
-        const font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        let maxWidth = 0
-
-        // Check if any file has a sync status (need extra width for icon)
-        const hasSyncStatus = files.some((f) => getSyncIconPath(syncStatusMap[f.path]))
-        const syncIconExtra = hasSyncStatus ? SYNC_ICON_WIDTH : 0
-
-        for (const file of files) {
-            const width = measureTextWidth(file.name, font)
-            if (width > maxWidth) maxWidth = width
-        }
-
-        // Add space for icon (16px) + gap (8px) + sync icon (if any) + padding
-        const totalWidth = maxWidth + 16 + 8 + syncIconExtra + COLUMN_PADDING * 2
-
-        // Clamp: minimum width, and max is containerWidth - 10px so next column peeks
-        const maxAllowed = containerWidth > 10 ? containerWidth - 10 : containerWidth
-        return Math.max(MIN_COLUMN_WIDTH, Math.min(totalWidth, maxAllowed))
-    })
+    // For now, use a fixed column width until we can calculate from visible files
+    // TODO: Calculate from visible entries after fetching
+    const maxFilenameWidth = $derived(Math.min(200, Math.max(MIN_COLUMN_WIDTH, containerWidth / 3)))
 
     // Total number of columns needed
-    const totalColumns = $derived(Math.ceil(files.length / itemsPerColumn))
+    const totalColumns = $derived(Math.ceil(totalCount / itemsPerColumn))
 
     // ==== Virtual scrolling (horizontal) ====
     const virtualWindow = $derived(
@@ -108,15 +93,113 @@
         }),
     )
 
-    // Get files for visible columns
+    // Create parent entry
+    function createParentEntry(): FileEntry {
+        return {
+            name: '..',
+            path: parentPath,
+            isDirectory: true,
+            isSymlink: false,
+            permissions: 0o755,
+            owner: '',
+            group: '',
+            iconId: 'dir',
+            extendedMetadataLoaded: true,
+        }
+    }
+
+    // Get entry at global index (handling ".." entry)
+    function getEntryAt(globalIndex: number): FileEntry | undefined {
+        if (hasParent && globalIndex === 0) {
+            return createParentEntry()
+        }
+
+        // Backend index (without ".." entry)
+        const backendIndex = hasParent ? globalIndex - 1 : globalIndex
+
+        // Find in cached entries
+        if (backendIndex >= cachedRange.start && backendIndex < cachedRange.end) {
+            return cachedEntries[backendIndex - cachedRange.start]
+        }
+
+        return undefined
+    }
+
+    // Fetch entries for the visible range
+    async function fetchVisibleRange() {
+        if (!listingId || isFetching) return
+
+        // Calculate which backend indices we need
+        const startCol = virtualWindow.startIndex
+        const endCol = virtualWindow.endIndex
+
+        // Convert column range to item range
+        let startItem = startCol * itemsPerColumn
+        let endItem = Math.min(endCol * itemsPerColumn, totalCount)
+
+        // Account for ".." entry
+        if (hasParent) {
+            startItem = Math.max(0, startItem - 1)
+            endItem = Math.max(0, endItem - 1)
+        }
+
+        // Add prefetch buffer
+        const fetchStart = Math.max(0, startItem - PREFETCH_BUFFER / 2)
+        const fetchEnd = Math.min(hasParent ? totalCount - 1 : totalCount, endItem + PREFETCH_BUFFER / 2)
+
+        // Only fetch if needed range isn't cached
+        if (fetchStart >= cachedRange.start && fetchEnd <= cachedRange.end) {
+            return // Already cached
+        }
+
+        isFetching = true
+        try {
+            const entries = await getFileRange(listingId, fetchStart, fetchEnd - fetchStart, includeHidden)
+            cachedEntries = entries
+            cachedRange = { start: fetchStart, end: fetchStart + entries.length }
+
+            // Prefetch icons for visible entries
+            const iconIds = entries.map((e) => e.iconId).filter((id) => id)
+            void prefetchIcons(iconIds)
+
+            // Request sync status for visible paths
+            const paths = entries.map((e) => e.path)
+            onSyncStatusRequest?.(paths)
+        } catch {
+            // Silently ignore fetch errors
+        } finally {
+            isFetching = false
+        }
+    }
+
+    // Get visible columns with files
+    // Note: We read cachedEntries/cachedRange here to establish reactive dependency
     const visibleColumns = $derived.by(() => {
+        // MUST read reactive state to establish dependency tracking
+        // Create local copies so the derived re-runs when these change
+        const entries = [...cachedEntries] // Spread to read all elements
+        const rangeStart = cachedRange.start
+        const rangeEnd = cachedRange.end
+
         const columns: { columnIndex: number; files: { file: FileEntry; globalIndex: number }[] }[] = []
         for (let col = virtualWindow.startIndex; col < virtualWindow.endIndex; col++) {
             const startFileIndex = col * itemsPerColumn
-            const endFileIndex = Math.min(startFileIndex + itemsPerColumn, files.length)
+            const endFileIndex = Math.min(startFileIndex + itemsPerColumn, totalCount)
             const columnFiles: { file: FileEntry; globalIndex: number }[] = []
             for (let i = startFileIndex; i < endFileIndex; i++) {
-                columnFiles.push({ file: files[i], globalIndex: i })
+                // Inline getEntryAt logic to use local variables
+                let entry: FileEntry | undefined
+                if (hasParent && i === 0) {
+                    entry = createParentEntry()
+                } else {
+                    const backendIndex = hasParent ? i - 1 : i
+                    if (backendIndex >= rangeStart && backendIndex < rangeEnd) {
+                        entry = entries[backendIndex - rangeStart]
+                    }
+                }
+                if (entry) {
+                    columnFiles.push({ file: entry, globalIndex: i })
+                }
             }
             if (columnFiles.length > 0) {
                 columns.push({ columnIndex: col, files: columnFiles })
@@ -125,102 +208,125 @@
         return columns
     })
 
-    function handleScroll(e: Event) {
-        const target = e.target as HTMLDivElement
-        scrollLeft = target.scrollLeft
+    // Fetch on scroll
+    function handleScroll() {
+        if (!scrollContainer) return
+        scrollLeft = scrollContainer.scrollLeft
+        void fetchVisibleRange()
     }
 
-    // Icon prefetching
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const prefetchedSet: Set<string> = new Set()
-
-    $effect(() => {
-        const newIconIds = visibleColumns
-            .flatMap((col) => col.files.map((f) => f.file.iconId))
-            .filter((id) => id && !prefetchedSet.has(id))
-        if (newIconIds.length > 0) {
-            newIconIds.forEach((id) => prefetchedSet.add(id))
-            void prefetchIcons(newIconIds)
-        }
-    })
-
-    // Icon cache reactivity
+    // Get icon URL for a file
+    // Subscribe to cache version - this makes getIconUrl reactive
     const _cacheVersion = $derived($iconCacheVersion)
 
     function getIconUrl(file: FileEntry): string | undefined {
-        void _cacheVersion
-        if (file.isDirectory) {
-            const pathIcon = getCachedIcon(`path:${file.path}`)
-            if (pathIcon) return pathIcon
-        }
+        void _cacheVersion // Track cache version for reactivity
         return getCachedIcon(file.iconId)
     }
 
+    // Fallback emoji for files without icons
     function getFallbackEmoji(file: FileEntry): string {
         if (file.isSymlink) return '🔗'
         if (file.isDirectory) return '📁'
         return '📄'
     }
 
-    function handleClick(globalIndex: number) {
-        onSelect(globalIndex)
-    }
+    // Handle file click
+    let lastClickTime = 0
+    let lastClickIndex = -1
+    const DOUBLE_CLICK_MS = 300
 
-    function handleDoubleClick(globalIndex: number) {
-        onNavigate(files[globalIndex])
-    }
-
-    // Keep selected item in view when container size changes (window resize)
-    $effect(() => {
-        // Track containerHeight and containerWidth to trigger on resize
-        if (containerHeight > 0 && containerWidth > 0 && scrollContainer && itemsPerColumn > 0) {
-            const columnIndex = Math.floor(selectedIndex / itemsPerColumn)
-            const newScrollLeft = getScrollToPosition(columnIndex, maxFilenameWidth, scrollLeft, containerWidth)
-            if (newScrollLeft !== undefined) {
-                scrollContainer.scrollLeft = newScrollLeft
-            }
+    function handleClick(index: number) {
+        const now = Date.now()
+        if (lastClickIndex === index && now - lastClickTime < DOUBLE_CLICK_MS) {
+            // Double click
+            const entry = getEntryAt(index)
+            if (entry) onNavigate(entry)
+        } else {
+            // Single click
+            onSelect(index)
         }
-    })
+        lastClickTime = now
+        lastClickIndex = index
+    }
 
-    // Scroll to bring selected item into view
+    function handleDoubleClick(index: number) {
+        const entry = getEntryAt(index)
+        if (entry) onNavigate(entry)
+    }
+
+    // Scroll to a specific index
     export function scrollToIndex(index: number) {
-        if (!scrollContainer || itemsPerColumn === 0) return
-
-        // Find which column contains this index
+        if (!scrollContainer) return
         const columnIndex = Math.floor(index / itemsPerColumn)
-        const newScrollLeft = getScrollToPosition(columnIndex, maxFilenameWidth, scrollLeft, containerWidth)
-        if (newScrollLeft !== undefined) {
-            scrollContainer.scrollLeft = newScrollLeft
+        const position = getScrollToPosition(columnIndex, maxFilenameWidth, scrollLeft, containerWidth)
+        if (position !== undefined) {
+            scrollContainer.scrollLeft = position
         }
     }
 
-    // Keyboard navigation - provided by parent
-    // Up/Down = prev/next item
-    // Left/Right = jump between columns
+    // Handle keyboard navigation
     export function handleKeyNavigation(key: string): number | undefined {
         if (key === 'ArrowUp') {
             return Math.max(0, selectedIndex - 1)
         }
         if (key === 'ArrowDown') {
-            return Math.min(files.length - 1, selectedIndex + 1)
+            return Math.min(totalCount - 1, selectedIndex + 1)
         }
         if (key === 'ArrowLeft') {
-            // Jump to same row in previous column, or first item if in leftmost column
             const newIndex = selectedIndex - itemsPerColumn
             return newIndex >= 0 ? newIndex : 0
         }
         if (key === 'ArrowRight') {
-            // Jump to same row in next column, or last item if in rightmost column
             const newIndex = selectedIndex + itemsPerColumn
-            return newIndex < files.length ? newIndex : files.length - 1
+            return newIndex < totalCount ? newIndex : totalCount - 1
         }
         return undefined
     }
+
+    // Track previous values to detect actual changes
+    let prevListingId = ''
+    let prevIncludeHidden = false
+
+    // Single effect: fetch when ready, reset cache only when listingId/includeHidden actually changes
+    $effect(() => {
+        // Read reactive dependencies
+        const currentListingId = listingId
+        const currentIncludeHidden = includeHidden
+        const height = containerHeight
+
+        if (!currentListingId || height <= 0) return
+
+        // Check if listingId or includeHidden actually changed
+        if (currentListingId !== prevListingId || currentIncludeHidden !== prevIncludeHidden) {
+            // Reset cache for new listing or filter change
+            cachedEntries = []
+            cachedRange = { start: 0, end: 0 }
+            prevListingId = currentListingId
+            prevIncludeHidden = currentIncludeHidden
+        }
+
+        void fetchVisibleRange()
+    })
 
     // Returns paths of currently visible files (for sync status polling)
     export function getVisiblePaths(): string[] {
         return visibleColumns.flatMap((col) => col.files.map((f) => f.file.path))
     }
+
+    // Track previous container height to detect resizes
+    let prevContainerHeight = 0
+
+    // Scroll to selected index when container height changes (e.g., window resize)
+    $effect(() => {
+        const height = containerHeight
+        // Only react to meaningful height changes (not initial 0)
+        if (height > 0 && prevContainerHeight > 0 && height !== prevContainerHeight) {
+            // Container height changed - scroll to keep selection visible
+            scrollToIndex(selectedIndex)
+        }
+        prevContainerHeight = height
+    })
 </script>
 
 <div
@@ -232,7 +338,7 @@
     onscroll={handleScroll}
     tabindex="-1"
     role="listbox"
-    aria-activedescendant={files[selectedIndex] ? `file-${String(selectedIndex)}` : undefined}
+    aria-activedescendant={selectedIndex >= 0 ? `file-${String(selectedIndex)}` : undefined}
 >
     <!-- Spacer div provides accurate scrollbar for full list width -->
     <div class="virtual-spacer" style="width: {virtualWindow.totalSize}px; height: 100%;">
@@ -257,7 +363,7 @@
                             oncontextmenu={(e) => {
                                 e.preventDefault()
                                 onSelect(globalIndex)
-                                onContextMenu?.(files[globalIndex])
+                                onContextMenu?.(file)
                             }}
                             role="option"
                             aria-selected={globalIndex === selectedIndex}

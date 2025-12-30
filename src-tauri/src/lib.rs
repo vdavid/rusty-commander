@@ -111,9 +111,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            commands::file_system::list_directory_start_session,
-            commands::file_system::list_directory_next_chunk,
-            commands::file_system::list_directory_end_session,
+            commands::file_system::list_directory_start,
+            commands::file_system::list_directory_end,
+            commands::file_system::get_file_range,
+            commands::file_system::get_file_at,
+            commands::file_system::get_total_count,
+            commands::file_system::find_file_index,
             commands::file_system::path_exists,
             commands::file_system::get_extended_metadata,
             commands::file_system::benchmark_log,
