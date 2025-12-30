@@ -20,6 +20,7 @@
     import SelectionInfo from './SelectionInfo.svelte'
     import LoadingIcon from '../LoadingIcon.svelte'
     import * as benchmark from '$lib/benchmark'
+    import { handleNavigationShortcut } from './keyboard-shortcuts'
 
     interface Props {
         initialPath: string
@@ -257,9 +258,9 @@
 
         // Handle arrow keys based on view mode
         if (viewMode === 'brief') {
-            // BriefList handles all arrow keys
+            // BriefList handles all arrow keys and shortcuts
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-            const newIndex: number | undefined = briefListRef?.handleKeyNavigation(e.key)
+            const newIndex: number | undefined = briefListRef?.handleKeyNavigation(e.key, e)
             if (newIndex !== undefined) {
                 e.preventDefault()
                 selectedIndex = newIndex
@@ -268,7 +269,24 @@
                 void fetchSelectedEntry()
             }
         } else {
-            // Full mode: only Up/Down navigate
+            // Full mode: try navigation shortcuts first
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+            const visibleItems: number = fullListRef?.getVisibleItemsCount() ?? 20
+            const shortcutResult = handleNavigationShortcut(e, {
+                currentIndex: selectedIndex,
+                totalCount: effectiveTotalCount,
+                visibleItems,
+            })
+            if (shortcutResult) {
+                e.preventDefault()
+                selectedIndex = shortcutResult.newIndex
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                fullListRef?.scrollToIndex(shortcutResult.newIndex)
+                void fetchSelectedEntry()
+                return
+            }
+
+            // Then handle Up/Down arrow navigation
             if (e.key === 'ArrowDown') {
                 e.preventDefault()
                 const newIndex = Math.min(selectedIndex + 1, effectiveTotalCount - 1)

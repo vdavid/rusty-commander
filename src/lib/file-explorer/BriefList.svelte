@@ -3,6 +3,7 @@
     import { getCachedIcon, prefetchIcons, iconCacheVersion } from '$lib/icon-cache'
     import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
     import { getFileRange } from '$lib/tauri-commands'
+    import { handleNavigationShortcut } from './keyboard-shortcuts'
 
     /** Prefetch buffer - load this many items around visible range */
     const PREFETCH_BUFFER = 200
@@ -266,7 +267,23 @@
     }
 
     // Handle keyboard navigation
-    export function handleKeyNavigation(key: string): number | undefined {
+    export function handleKeyNavigation(key: string, event?: KeyboardEvent): number | undefined {
+        // Try navigation shortcuts first (Home/End/PageUp/PageDown)
+        if (event) {
+            // Calculate number of visible columns for PageUp/PageDown
+            const visibleColumns = Math.ceil(containerWidth / maxFilenameWidth)
+            const result = handleNavigationShortcut(event, {
+                currentIndex: selectedIndex,
+                totalCount,
+                itemsPerColumn,
+                visibleColumns,
+            })
+            if (result) {
+                return result.newIndex
+            }
+        }
+
+        // Handle arrow keys
         if (key === 'ArrowUp') {
             return Math.max(0, selectedIndex - 1)
         }

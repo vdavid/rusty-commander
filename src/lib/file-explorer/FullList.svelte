@@ -304,6 +304,11 @@
     export function getVisiblePaths(): string[] {
         return visibleFiles.map((f) => f.file.path)
     }
+
+    // Returns the number of visible items (for Page Up/Down navigation)
+    export function getVisibleItemsCount(): number {
+        return Math.ceil(containerHeight / ROW_HEIGHT)
+    }
 </script>
 
 <div

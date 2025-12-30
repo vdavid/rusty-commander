@@ -27,6 +27,7 @@
 - [ ] Load Google Drive sync statuses, too
 - [ ] Load OneDrive sync statuses, too?
 - [ ] Enable file drag&drop from the app to other apps.
+- [x] `⌥↑` and `⌥↓` should be home/end, `Fn←` and `Fn→` same, then `Fn↑` and `Fn--↓` should be page up/down.
 
 ## Cleanup
 
