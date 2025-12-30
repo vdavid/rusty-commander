@@ -110,9 +110,24 @@
             lastSequence = 0
         }
 
+        // Set loading state BEFORE starting expensive IPC call
+        // This ensures the UI shows the loading spinner immediately
         loading = true
         error = null
         syncStatusMap = {}
+        totalCount = 0 // Reset to show empty list immediately
+        selectedEntry = null // Clear old selection
+
+        // CRITICAL: Wait for browser to actually PAINT the loading state before IPC call
+        // tick() only flushes Svelte render, requestAnimationFrame waits for paint
+        // Double-RAF ensures we wait for both the render AND the paint to complete
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    resolve()
+                })
+            })
+        })
 
         try {
             // Start listing - returns just listingId and totalCount (no entries!)
