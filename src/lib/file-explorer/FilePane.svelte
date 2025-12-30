@@ -1,18 +1,18 @@
 <script lang="ts">
-    import { onMount, tick, untrack, onDestroy } from 'svelte'
-    import type { FileEntry, DirectoryDiff, SyncStatus } from './types'
+    import { onDestroy, onMount, tick, untrack } from 'svelte'
+    import type { DirectoryDiff, FileEntry, SyncStatus } from './types'
     import {
+        findFileIndex,
+        getFileAt,
+        getSyncStatus,
+        getTotalCount,
+        listDirectoryEnd,
+        listDirectoryStart,
         listen,
         openFile,
         showFileContextMenu,
-        updateMenuContext,
-        listDirectoryStart,
-        listDirectoryEnd,
-        findFileIndex,
-        getFileAt,
-        getTotalCount,
-        getSyncStatus,
         type UnlistenFn,
+        updateMenuContext,
     } from '$lib/tauri-commands'
     import type { ViewMode } from '$lib/app-status-store'
     import FullList from './FullList.svelte'
@@ -196,8 +196,7 @@
         const backendIndex = hasParent ? selectedIndex - 1 : selectedIndex
 
         try {
-            const entry = await getFileAt(listingId, backendIndex, includeHidden)
-            selectedEntry = entry
+            selectedEntry = await getFileAt(listingId, backendIndex, includeHidden)
         } catch {
             selectedEntry = null
         }
