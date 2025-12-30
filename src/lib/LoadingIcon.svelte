@@ -27,32 +27,43 @@
 
     .loader {
         width: 50px;
-        aspect-ratio: 1;
-        border-radius: 50%;
-        background: #a13200;
-        mask: radial-gradient(circle closest-side at 50% 40%, #0000 94%, #000);
-        transform-origin: 50% 40%;
-        animation: l25 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        height: 50px;
+        position: relative;
     }
 
-    @keyframes l25 {
+    .loader:before,
+    .loader:after {
+        content: '';
+        border-radius: 50%;
+        position: absolute;
+        inset: 0;
+        box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.3) inset;
+    }
+
+    .loader:after {
+        box-shadow: 0 2px 0 #ff9e1b inset;
+        animation: rotate 2s linear infinite;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .loader:after {
+            box-shadow: 0 2px 0 #a13200 inset;
+        }
+    }
+
+    @keyframes rotate {
+        0% {
+            transform: rotate(0);
+        }
+
         100% {
-            transform: rotate(2turn);
+            transform: rotate(360deg);
         }
     }
 
     .loading-text {
         color: var(--color-text-secondary);
         animation: pulse 3s ease-in-out infinite;
-    }
-
-    @keyframes rotationBack {
-        0% {
-            transform: rotate(0deg);
-        }
-        100% {
-            transform: rotate(-360deg);
-        }
     }
 
     @keyframes pulse {
