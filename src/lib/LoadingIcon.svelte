@@ -1,25 +1,4 @@
-<script lang="ts">
-    import { onMount } from 'svelte'
-
-    /** Delay before the loader becomes visible */
-    const DELAY_MS = 200
-
-    let visible = $state(false)
-    let mounted = false
-
-    onMount(() => {
-        mounted = true
-        const timer = setTimeout(() => {
-            if (mounted) visible = true
-        }, DELAY_MS)
-        return () => {
-            mounted = false
-            clearTimeout(timer)
-        }
-    })
-</script>
-
-<div class="loading-container" class:visible>
+<div class="loading-container">
     <div class="loader"></div>
     <div class="loading-text">Loading...</div>
 </div>
@@ -33,50 +12,33 @@
         gap: 20px;
         width: 100%;
         height: 100%;
-        opacity: 0;
-        transition: opacity 0ms;
+        animation: fadeIn 400ms ease-in;
     }
 
-    .loading-container.visible {
-        opacity: 1;
-        transition: opacity 500ms ease-in;
+    @keyframes fadeIn {
+        0%,
+        50% {
+            opacity: 0;
+        }
+        100% {
+            opacity: 1;
+        }
     }
 
     .loader {
-        width: 48px;
-        height: 48px;
-        background: #a13200;
-        display: block;
-        position: relative;
-        box-sizing: border-box;
-        animation: rotationBack 1s ease-in-out infinite reverse;
-    }
-
-    .loader::before {
-        content: '';
-        box-sizing: border-box;
-        left: 0;
-        top: 0;
-        transform: rotate(45deg);
-        position: absolute;
-        width: 48px;
-        height: 48px;
-        background: #a13200;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
-    }
-
-    .loader::after {
-        content: '';
-        box-sizing: border-box;
-        width: 32px;
-        height: 32px;
+        width: 50px;
+        aspect-ratio: 1;
         border-radius: 50%;
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        background: #ff9e1b;
-        transform: translate(-50%, -50%);
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+        background: #a13200;
+        mask: radial-gradient(circle closest-side at 50% 40%, #0000 94%, #000);
+        transform-origin: 50% 40%;
+        animation: l25 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes l25 {
+        100% {
+            transform: rotate(2turn);
+        }
     }
 
     .loading-text {
