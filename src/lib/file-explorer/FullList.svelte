@@ -323,7 +323,7 @@
         <div class="virtual-window" style="transform: translateY({virtualWindow.offset}px);">
             {#each visibleFiles as { file, globalIndex } (file.path)}
                 {@const syncIcon = getSyncIconPath(syncStatusMap[file.path])}
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
+                <!-- svelte-ignore a11y_click_events_have_key_events,a11y_interactive_supports_focus -->
                 <div
                     id={`file-${String(globalIndex)}`}
                     class="file-entry"
@@ -350,20 +350,20 @@
                             <span class="icon-emoji">{getFallbackEmoji(file)}</span>
                         {/if}
                         {#if file.isSymlink}
-                            <span class="symlink-badge">🔗</span>
+                            <span class="symlink-badge" class:has-sync={!!syncIcon}>🔗</span>
+                        {/if}
+                        {#if syncIcon}
+                            <img
+                                class="sync-badge"
+                                src={syncIcon}
+                                alt={syncStatusMap[file.path] ?? ''}
+                                width="10"
+                                height="10"
+                            />
                         {/if}
                     </span>
                     <span class="col-name">
                         <span class="name-text">{file.name}</span>
-                        {#if syncIcon}
-                            <img
-                                class="sync-icon"
-                                src={syncIcon}
-                                alt={syncStatusMap[file.path] ?? ''}
-                                width="12"
-                                height="12"
-                            />
-                        {/if}
                     </span>
                     <span class="col-size" title={file.size !== undefined ? formatHumanReadable(file.size) : ''}>
                         {#if file.isDirectory}
@@ -446,6 +446,21 @@
         line-height: 1;
     }
 
+    .symlink-badge.has-sync {
+        bottom: auto;
+        right: auto;
+        top: -2px;
+        left: -2px;
+    }
+
+    .sync-badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 10px;
+        height: 10px;
+    }
+
     .col-name {
         display: flex;
         align-items: center;
@@ -461,11 +476,6 @@
 
     .is-directory .name-text {
         font-weight: 600;
-    }
-
-    .sync-icon {
-        flex-shrink: 0;
-        opacity: 0.9;
     }
 
     .col-size {

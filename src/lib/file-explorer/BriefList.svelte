@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { FileEntry, SyncStatus } from './types'
-    import { getCachedIcon, prefetchIcons, iconCacheVersion } from '$lib/icon-cache'
+    import { getCachedIcon, iconCacheVersion, prefetchIcons } from '$lib/icon-cache'
     import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
     import { getFileRange } from '$lib/tauri-commands'
     import { handleNavigationShortcut } from './keyboard-shortcuts'
@@ -310,9 +310,7 @@
         // Read reactive dependencies
         const currentListingId = listingId
         const currentIncludeHidden = includeHidden
-        const height = containerHeight
-
-        if (!currentListingId || height <= 0) return
+        if (!currentListingId || containerHeight <= 0) return
 
         // Check if listingId or includeHidden actually changed
         if (currentListingId !== prevListingId || currentIncludeHidden !== prevIncludeHidden) {
@@ -365,7 +363,7 @@
                 <div class="column" style="width: {maxFilenameWidth}px;">
                     {#each column.files as { file, globalIndex } (file.path)}
                         {@const syncIcon = getSyncIconPath(syncStatusMap[file.path])}
-                        <!-- svelte-ignore a11y_click_events_have_key_events a11y_interactive_supports_focus -->
+                        <!-- svelte-ignore a11y_click_events_have_key_events,a11y_interactive_supports_focus -->
                         <div
                             id={`file-${String(globalIndex)}`}
                             class="file-entry"
@@ -392,13 +390,13 @@
                                     <span class="icon-emoji">{getFallbackEmoji(file)}</span>
                                 {/if}
                                 {#if file.isSymlink}
-                                    <span class="symlink-badge">🔗</span>
+                                    <span class="symlink-badge" class:has-sync={!!syncIcon}>🔗</span>
+                                {/if}
+                                {#if syncIcon}
+                                    <img class="sync-badge" src={syncIcon} alt="" width="10" height="10" />
                                 {/if}
                             </span>
                             <span class="name">{file.name}</span>
-                            {#if syncIcon}
-                                <img class="sync-icon" src={syncIcon} alt="" width="12" height="12" />
-                            {/if}
                         </div>
                     {/each}
                 </div>
@@ -483,6 +481,21 @@
         line-height: 1;
     }
 
+    .symlink-badge.has-sync {
+        bottom: auto;
+        right: auto;
+        top: -2px;
+        left: -2px;
+    }
+
+    .sync-badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 10px;
+        height: 10px;
+    }
+
     .name {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -490,12 +503,6 @@
 
     .is-directory .name {
         font-weight: 600;
-    }
-
-    .sync-icon {
-        flex-shrink: 0;
-        margin-left: auto;
-        opacity: 0.9;
     }
 
     @media (prefers-color-scheme: dark) {
