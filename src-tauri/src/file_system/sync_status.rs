@@ -59,17 +59,19 @@ fn get_sync_status(path: &Path) -> SyncStatus {
         }
     } else {
         // File has local content - could be synced or uploading
-        if is_uploading(path) {
-            SyncStatus::Uploading
-        } else {
-            SyncStatus::Synced
+        // Use is_cloud_file() to check if this is actually a cloud file
+        match is_uploading_cloud_file(path) {
+            Some(true) => SyncStatus::Uploading,
+            Some(false) => SyncStatus::Synced,
+            None => SyncStatus::Unknown, // Not a cloud file
         }
     }
 }
 
 /// Checks if file is currently uploading via NSURL resource values.
-fn is_uploading(path: &Path) -> bool {
-    get_ubiquitous_bool(path, "NSURLUbiquitousItemIsUploadingKey").unwrap_or(false)
+/// Returns None if file is not a cloud file.
+fn is_uploading_cloud_file(path: &Path) -> Option<bool> {
+    get_ubiquitous_bool(path, "NSURLUbiquitousItemIsUploadingKey")
 }
 
 /// Checks if file is currently downloading via NSURL resource values.
