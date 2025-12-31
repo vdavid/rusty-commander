@@ -53,6 +53,9 @@ pub fn run() {
             // Initialize the file watcher manager with app handle for events
             file_system::init_watcher_manager(app.handle().clone());
 
+            // Initialize the volume manager with the root volume
+            file_system::init_volume_manager();
+
             // Initialize font metrics for default font (system font at 12px)
             font_metrics::init_font_metrics(app.handle(), "system-400-12");
 

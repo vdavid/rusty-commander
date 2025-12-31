@@ -126,3 +126,50 @@ fn test_get_extended_metadata_batch_empty_input() {
     let extended = get_extended_metadata_batch(vec![]);
     assert!(extended.is_empty());
 }
+
+// ============================================================================
+// Tests for get_single_entry
+// ============================================================================
+
+#[test]
+fn test_get_single_entry_file() {
+    let temp_dir = std::env::temp_dir().join("rusty_commander_single_entry_test");
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let test_file = temp_dir.join("single_file.txt");
+    fs::write(&test_file, "test content").unwrap();
+
+    let entry = super::operations::get_single_entry(&test_file).unwrap();
+
+    // Cleanup
+    let _ = fs::remove_file(&test_file);
+    let _ = fs::remove_dir(&temp_dir);
+
+    assert_eq!(entry.name, "single_file.txt");
+    assert!(!entry.is_directory);
+    assert!(!entry.is_symlink);
+    assert_eq!(entry.size, Some(12)); // "test content" is 12 bytes
+    assert!(!entry.extended_metadata_loaded);
+}
+
+#[test]
+fn test_get_single_entry_directory() {
+    let temp_dir = std::env::temp_dir().join("rusty_commander_single_dir_test");
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let entry = super::operations::get_single_entry(&temp_dir).unwrap();
+
+    // Cleanup
+    let _ = fs::remove_dir(&temp_dir);
+
+    assert!(entry.name.contains("rusty_commander_single_dir_test"));
+    assert!(entry.is_directory);
+    assert!(!entry.is_symlink);
+    assert!(entry.size.is_none());
+}
+
+#[test]
+fn test_get_single_entry_nonexistent() {
+    let result = super::operations::get_single_entry(std::path::Path::new("/definitely_does_not_exist_12345"));
+    assert!(result.is_err());
+}

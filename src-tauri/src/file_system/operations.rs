@@ -25,9 +25,12 @@ static LISTING_CACHE: LazyLock<RwLock<HashMap<String, CachedListing>>> = LazyLoc
 
 /// Cached directory listing for on-demand virtual scrolling.
 struct CachedListing {
+    /// Volume ID this listing belongs to (e.g., "root", "dropbox")
+    volume_id: String,
+    /// Path within the volume (absolute path for now)
     path: std::path::PathBuf,
+    /// Cached file entries
     entries: Vec<FileEntry>,
-    // No cursor - frontend fetches by range on demand
 }
 
 /// Resolves a uid to a username, with caching.
@@ -292,13 +295,43 @@ pub struct ListingStartResult {
 /// # Returns
 /// A `ListingStartResult` with listing ID and total count.
 pub fn list_directory_start(path: &Path, include_hidden: bool) -> Result<ListingStartResult, std::io::Error> {
+    // Use the default volume from VolumeManager
+    list_directory_start_with_volume("root", path, include_hidden)
+}
+
+/// Starts a new directory listing using a specific volume.
+///
+/// This is the internal implementation that supports multi-volume access.
+///
+/// # Arguments
+/// * `volume_id` - The volume ID to use (e.g., "root", "dropbox")
+/// * `path` - The directory path to list (relative to volume root)
+/// * `include_hidden` - Whether to include hidden files in total count
+///
+/// # Returns
+/// A `ListingStartResult` with listing ID and total count.
+pub fn list_directory_start_with_volume(
+    volume_id: &str,
+    path: &Path,
+    include_hidden: bool,
+) -> Result<ListingStartResult, std::io::Error> {
     // Reset benchmark epoch for this navigation
     benchmark::reset_epoch();
     benchmark::log_event_value("list_directory_start CALLED", path.display());
 
-    // Use list_directory_core for fast loading (skips macOS extended metadata)
-    let all_entries = list_directory_core(path)?;
-    benchmark::log_event_value("list_directory_core COMPLETE, entries", all_entries.len());
+    // Get the volume from VolumeManager
+    let volume = super::get_volume_manager().get(volume_id).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Volume '{}' not found", volume_id),
+        )
+    })?;
+
+    // Use the Volume trait to list the directory
+    let all_entries = volume
+        .list_directory(path)
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    benchmark::log_event_value("volume.list_directory COMPLETE, entries", all_entries.len());
 
     // Generate listing ID
     let listing_id = Uuid::new_v4().to_string();
@@ -315,16 +348,23 @@ pub fn list_directory_start(path: &Path, include_hidden: bool) -> Result<Listing
         cache.insert(
             listing_id.clone(),
             CachedListing {
+                volume_id: volume_id.to_string(),
                 path: path.to_path_buf(),
                 entries: all_entries.clone(),
             },
         );
     }
 
-    // Start watching the directory (reads initial state from cache)
-    if let Err(e) = start_watching(&listing_id, path) {
-        eprintln!("[LISTING] Failed to start watcher: {}", e);
-        // Continue anyway - watcher is optional enhancement
+    // Start watching the directory (only if volume supports it)
+    // For now, we still use the absolute path for watching
+    // TODO: Update watcher to be volume-aware
+    if volume.supports_watching() {
+        // For LocalPosixVolume, the path is already absolute or needs to be resolved
+        // We use the original path since LocalPosixVolume root is "/"
+        if let Err(e) = start_watching(&listing_id, path) {
+            eprintln!("[LISTING] Failed to start watcher: {}", e);
+            // Continue anyway - watcher is optional enhancement
+        }
     }
 
     // Calculate max filename width if font metrics are available
@@ -628,6 +668,72 @@ pub fn list_directory_core(path: &Path) -> Result<Vec<FileEntry>, std::io::Error
     benchmark::log_event("list_directory_core END");
 
     Ok(entries)
+}
+
+/// Gets metadata for a single file or directory path.
+///
+/// This is used when we need metadata for a single path rather than listing
+/// a directory. Useful for symlink target resolution and volume implementations.
+///
+/// # Arguments
+/// * `path` - Absolute path to the file or directory
+///
+/// # Returns
+/// A FileEntry with metadata for the path
+pub fn get_single_entry(path: &Path) -> Result<FileEntry, std::io::Error> {
+    // Check if it's a symlink first
+    let symlink_meta = fs::symlink_metadata(path)?;
+    let is_symlink = symlink_meta.file_type().is_symlink();
+
+    // For symlinks, check if the target is a directory
+    let target_is_dir = if is_symlink {
+        fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+    } else {
+        false
+    };
+
+    // Use symlink metadata for the entry (not following the link)
+    let metadata = &symlink_meta;
+    let is_dir = metadata.is_dir() || target_is_dir;
+
+    let name = path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string_lossy().to_string());
+
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs());
+
+    let created = metadata
+        .created()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs());
+
+    let uid = metadata.uid();
+    let gid = metadata.gid();
+    let owner = get_owner_name(uid);
+    let group = get_group_name(gid);
+
+    Ok(FileEntry {
+        name: name.clone(),
+        path: path.to_string_lossy().to_string(),
+        is_directory: is_dir,
+        is_symlink,
+        size: if metadata.is_file() { Some(metadata.len()) } else { None },
+        modified_at: modified,
+        created_at: created,
+        added_at: None,
+        opened_at: None,
+        permissions: metadata.permissions().mode(),
+        owner,
+        group,
+        icon_id: get_icon_id(is_dir, is_symlink, &name),
+        extended_metadata_loaded: false,
+    })
 }
 
 /// Extended metadata for a single file (macOS-specific fields).

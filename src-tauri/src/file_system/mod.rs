@@ -1,17 +1,21 @@
-//! File system module - operations, watchers, and providers.
+//! File system module - operations, watchers, volumes, and providers.
 
 #[cfg(target_os = "macos")]
 mod macos_metadata;
 #[cfg(test)]
 mod mock_provider;
-mod operations;
+pub(crate) mod operations;
 #[cfg(test)]
 mod provider;
 #[cfg(test)]
 mod real_provider;
 #[cfg(target_os = "macos")]
 pub mod sync_status;
+pub mod volume;
+mod volume_manager;
 mod watcher;
+
+use std::sync::{Arc, LazyLock};
 
 // Re-export public types
 #[cfg(test)]
@@ -23,8 +27,32 @@ pub use operations::{
 // FileEntry also re-exported for internal test modules
 #[cfg(test)]
 pub use provider::FileSystemProvider;
+// Re-export volume types (some not used externally yet)
+#[allow(unused_imports)]
+pub use volume::{InMemoryVolume, LocalPosixVolume, Volume, VolumeError};
+#[allow(unused_imports)]
+pub use volume_manager::VolumeManager;
 // Watcher management - init_watcher_manager must be called from lib.rs
 pub use watcher::init_watcher_manager;
+
+/// Global volume manager instance
+static VOLUME_MANAGER: LazyLock<VolumeManager> = LazyLock::new(VolumeManager::new);
+
+/// Initializes the global volume manager with the root volume.
+///
+/// This should be called during app startup (after init_watcher_manager).
+/// Registers the "root" volume pointing to "/" (the entire filesystem).
+pub fn init_volume_manager() {
+    let root_volume = Arc::new(LocalPosixVolume::new("Macintosh HD", "/"));
+    VOLUME_MANAGER.register("root", root_volume);
+    VOLUME_MANAGER.set_default("root");
+}
+
+/// Returns a reference to the global volume manager.
+#[allow(dead_code)] // Will be used in Phase 4.2 when commands use it
+pub fn get_volume_manager() -> &'static VolumeManager {
+    &VOLUME_MANAGER
+}
 
 #[cfg(test)]
 mod operations_test;
@@ -34,3 +62,6 @@ mod watcher_test;
 
 #[cfg(test)]
 mod mock_provider_test;
+
+#[cfg(test)]
+mod integration_test;
