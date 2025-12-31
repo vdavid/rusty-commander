@@ -274,21 +274,29 @@
     // Track previous values to detect actual changes
     let prevListingId = ''
     let prevIncludeHidden = false
+    let prevTotalCount = 0
 
-    // Single effect: fetch when ready, reset cache only when listingId/includeHidden actually changes
+    // Single effect: fetch when ready, reset cache only when listingId/includeHidden/totalCount actually changes
     $effect(() => {
         // Read reactive dependencies
         const currentListingId = listingId
         const currentIncludeHidden = includeHidden
+        const currentTotalCount = totalCount
         if (!currentListingId || containerHeight <= 0) return
 
-        // Check if listingId or includeHidden actually changed
-        if (currentListingId !== prevListingId || currentIncludeHidden !== prevIncludeHidden) {
-            // Reset cache for new listing or filter change
+        // Check if listingId, includeHidden, or totalCount actually changed
+        // totalCount changes when files are added/removed by the file watcher
+        if (
+            currentListingId !== prevListingId ||
+            currentIncludeHidden !== prevIncludeHidden ||
+            currentTotalCount !== prevTotalCount
+        ) {
+            // Reset cache for new listing, filter change, or file count change
             cachedEntries = []
             cachedRange = { start: 0, end: 0 }
             prevListingId = currentListingId
             prevIncludeHidden = currentIncludeHidden
+            prevTotalCount = currentTotalCount
         }
 
         void fetchVisibleRange()

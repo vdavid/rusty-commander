@@ -4,11 +4,13 @@
 
 ## Context
 
-The original `bincode` crate became unmaintained in late 2024/early 2025 due to a doxxing and harassment incident. The maintainer ceased all development and published v3.0.0 as a "tombstone" release that intentionally fails to compile.
+The original `bincode` crate became unmaintained in late 2024/early 2025 due to a doxxing and harassment incident. The
+maintainer ceased all development and published v3.0.0 as a "tombstone" release that intentionally fails to compile.
 
 ## Decision
 
 Migrated to `bincode2` v2, a maintained fork by Pravega, which provides:
+
 - Drop-in replacement with minimal code changes
 - Ongoing maintenance and security updates
 - Compatible API with bincode v1
@@ -25,8 +27,8 @@ Migrated to `bincode2` v2, a maintained fork by Pravega, which provides:
 
 1. **Cargo.toml**: Changed `bincode = "1"` to `bincode2 = "2"`
 2. **src-tauri/src/font_metrics/mod.rs**: Updated two function calls:
-   - `bincode::deserialize()` → `bincode2::deserialize()`
-   - `bincode::serialize()` → `bincode2::serialize()`
+    - `bincode::deserialize()` → `bincode2::deserialize()`
+    - `bincode::serialize()` → `bincode2::serialize()`
 3. **docs/features/font-metrics.md**: Updated documentation to mention bincode2
 
 ## Impact

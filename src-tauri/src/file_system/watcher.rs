@@ -1,6 +1,7 @@
 //! File system watcher with debouncing and diff computation.
 //!
 //! Watches directories for changes, computes diffs, and emits events to frontend.
+//! Uses the unified LISTING_CACHE from operations.rs (no duplicate cache).
 
 use notify_debouncer_full::{
     DebounceEventResult, Debouncer, RecommendedCache, new_debouncer,
@@ -8,12 +9,12 @@ use notify_debouncer_full::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-use super::operations::{FileEntry, list_directory_core};
+use super::operations::{FileEntry, get_listing_entries, list_directory_core, update_listing_entries};
 
 /// Debounce duration in milliseconds
 const DEBOUNCE_MS: u64 = 200;
@@ -44,12 +45,11 @@ pub struct DirectoryDiff {
     pub changes: Vec<DiffChange>,
 }
 
-/// State for a watched directory
+/// State for a watched directory.
+/// NOTE: No `entries` field - we use the unified LISTING_CACHE instead.
 struct WatchedDirectory {
-    path: PathBuf,
-    entries: Vec<FileEntry>,
     sequence: u64,
-    #[allow(dead_code)] // Watcher must be held to keep watching
+    #[allow(dead_code)] // Debouncer must be held to keep watching
     debouncer: Debouncer<RecommendedWatcher, RecommendedCache>,
 }
 
@@ -76,16 +76,16 @@ pub fn init_watcher_manager(app: AppHandle) {
     }
 }
 
-/// Start watching a directory for a given session.
+/// Start watching a directory for a given listing.
 ///
 /// # Arguments
-/// * `session_id` - The session ID from list_directory_start
+/// * `listing_id` - The listing ID from list_directory_start
 /// * `path` - The directory path to watch
-/// * `initial_entries` - The initial directory entries (for diff computation)
-pub fn start_watching(session_id: &str, path: &Path, initial_entries: Vec<FileEntry>) -> Result<(), String> {
-    let session_id_owned = session_id.to_string();
-    let path_owned = path.to_path_buf();
-    let session_for_closure = session_id_owned.clone();
+///
+/// Note: Initial entries are read from LISTING_CACHE when needed.
+pub fn start_watching(listing_id: &str, path: &Path) -> Result<(), String> {
+    let listing_id_owned = listing_id.to_string();
+    let listing_for_closure = listing_id_owned.clone();
 
     // Create the debouncer with a callback that handles changes
     let mut debouncer = new_debouncer(
@@ -94,7 +94,7 @@ pub fn start_watching(session_id: &str, path: &Path, initial_entries: Vec<FileEn
         move |result: DebounceEventResult| {
             if let Ok(_events) = result {
                 // Events occurred - re-read directory and compute diff
-                handle_directory_change(&session_for_closure);
+                handle_directory_change(&listing_for_closure);
             }
         },
     )
@@ -105,45 +105,39 @@ pub fn start_watching(session_id: &str, path: &Path, initial_entries: Vec<FileEn
         .watch(path, RecursiveMode::NonRecursive)
         .map_err(|e| format!("Failed to watch path: {}", e))?;
 
-    // Store in manager
+    // Store in manager (no entries - we use LISTING_CACHE)
     let mut manager = WATCHER_MANAGER.write().map_err(|_| "Failed to acquire watcher lock")?;
 
-    manager.watches.insert(
-        session_id_owned.clone(),
-        WatchedDirectory {
-            path: path_owned,
-            entries: initial_entries,
-            sequence: 0,
-            debouncer,
-        },
-    );
+    manager
+        .watches
+        .insert(listing_id_owned, WatchedDirectory { sequence: 0, debouncer });
 
     Ok(())
 }
 
-/// Stop watching a directory for a given session.
-pub fn stop_watching(session_id: &str) {
+/// Stop watching a directory for a given listing.
+pub fn stop_watching(listing_id: &str) {
     if let Ok(mut manager) = WATCHER_MANAGER.write() {
         // Dropping the WatchedDirectory will drop the debouncer
-        manager.watches.remove(session_id);
+        manager.watches.remove(listing_id);
     }
 }
 
 /// Handle a directory change event.
-/// Re-reads the directory, computes diff, and emits event.
-fn handle_directory_change(session_id: &str) {
-    let (path, old_entries, app_handle) = {
+/// Re-reads the directory, computes diff, updates LISTING_CACHE, and emits event.
+fn handle_directory_change(listing_id: &str) {
+    // Get old entries and path from the unified LISTING_CACHE
+    let Some((path, old_entries)) = get_listing_entries(listing_id) else {
+        return; // Listing no longer exists
+    };
+
+    // Get app handle for emitting events
+    let app_handle = {
         let manager = match WATCHER_MANAGER.read() {
             Ok(m) => m,
             Err(_) => return,
         };
-
-        let watch = match manager.watches.get(session_id) {
-            Some(w) => w,
-            None => return,
-        };
-
-        (watch.path.clone(), watch.entries.clone(), manager.app_handle.clone())
+        manager.app_handle.clone()
     };
 
     // Re-read the directory using core metadata (extended metadata not needed for diffs)
@@ -162,19 +156,21 @@ fn handle_directory_change(session_id: &str) {
         return; // No actual changes
     }
 
-    // Update stored entries and increment sequence
+    // Update the unified LISTING_CACHE with new entries
+    update_listing_entries(listing_id, new_entries);
+
+    // Increment sequence and get current value
     let sequence = {
         let mut manager = match WATCHER_MANAGER.write() {
             Ok(m) => m,
             Err(_) => return,
         };
 
-        let watch = match manager.watches.get_mut(session_id) {
+        let watch = match manager.watches.get_mut(listing_id) {
             Some(w) => w,
             None => return,
         };
 
-        watch.entries = new_entries;
         watch.sequence += 1;
         watch.sequence
     };
@@ -182,7 +178,7 @@ fn handle_directory_change(session_id: &str) {
     // Emit event to frontend
     if let Some(app) = app_handle {
         let diff = DirectoryDiff {
-            listing_id: session_id.to_string(),
+            listing_id: listing_id.to_string(),
             sequence,
             changes,
         };

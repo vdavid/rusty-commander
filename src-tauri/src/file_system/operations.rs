@@ -310,21 +310,21 @@ pub fn list_directory_start(path: &Path, include_hidden: bool) -> Result<Listing
         all_entries.iter().filter(|e| !e.name.starts_with('.')).count()
     };
 
-    // Start watching the directory
-    if let Err(e) = start_watching(&listing_id, path, all_entries.clone()) {
-        eprintln!("[LISTING] Failed to start watcher: {}", e);
-        // Continue anyway - watcher is optional enhancement
-    }
-
-    // Cache the entries (no cursor needed - frontend fetches by range)
+    // Cache the entries FIRST (watcher will read from here)
     if let Ok(mut cache) = LISTING_CACHE.write() {
         cache.insert(
             listing_id.clone(),
             CachedListing {
                 path: path.to_path_buf(),
-                entries: all_entries.clone(), // Clone to allow reuse below
+                entries: all_entries.clone(),
             },
         );
+    }
+
+    // Start watching the directory (reads initial state from cache)
+    if let Err(e) = start_watching(&listing_id, path) {
+        eprintln!("[LISTING] Failed to start watcher: {}", e);
+        // Continue anyway - watcher is optional enhancement
     }
 
     // Calculate max filename width if font metrics are available
@@ -458,6 +458,27 @@ pub fn list_directory_end(listing_id: &str) {
     // Remove from listing cache
     if let Ok(mut cache) = LISTING_CACHE.write() {
         cache.remove(listing_id);
+    }
+}
+
+// ============================================================================
+// Internal cache accessors for file watcher
+// ============================================================================
+
+/// Gets entries and path from the listing cache (for watcher diff computation).
+/// Returns None if listing not found.
+pub(super) fn get_listing_entries(listing_id: &str) -> Option<(std::path::PathBuf, Vec<FileEntry>)> {
+    let cache = LISTING_CACHE.read().ok()?;
+    let listing = cache.get(listing_id)?;
+    Some((listing.path.clone(), listing.entries.clone()))
+}
+
+/// Updates the entries in the listing cache (after watcher detects changes).
+pub(super) fn update_listing_entries(listing_id: &str, entries: Vec<FileEntry>) {
+    if let Ok(mut cache) = LISTING_CACHE.write()
+        && let Some(listing) = cache.get_mut(listing_id)
+    {
+        listing.entries = entries;
     }
 }
 
