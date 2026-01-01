@@ -1,19 +1,21 @@
 ## Listing
 
+- [x] Build a (set of) dmg release(s) and document the process
+- [...] Enable file drag&drop from the app to other apps.
 - [ ] Add "change drive" feature
+- [ ] Test with slow drives like network drives
+- [ ] We need to ask for permissions for `Downloads`, etc. Handle permission denial gracefully!
 - [ ] Add different sorting options
 - [ ] When sorting alphabetically, sort numbers ascending, not alphabetically
-- [ ] Build a (set of) dmg release(s) and document the process
 - [ ] Load iCloud sync statuses, too
 - [ ] Load Google Drive sync statuses, too
 - [ ] Load OneDrive sync statuses, too?
-- [ ] Enable file drag&drop from the app to other apps.
-- [ ] Test with slow drives like network drives
+- [ ] Read the "dataless" flag for Dropbox/Drive files to avoid triggering a massive download when iterating through the
+      files later, to generate thumbnails or whatnot. Files are only placeholders in this case: they have a file size in
+      `stat`, but zero bytes on disk.
 
 ## Cleanup
 
-- Fix calculating the Brief mode widths in Rust!
-- Cancel requests in Rust when the dir is closed
 - A round of refactoring is due
 - Better test coverage to avoid regressions!
 
@@ -39,7 +41,21 @@
     - 🟠 Hard Compress selected file(s) 6 Need to call zip or use a Rust crate
     - 🟠 Hard Color tags (macOS) 7 Requires extended attributes - xattr crate
     - 🟠 Hard Tags... dialog 7 UI for managing tags + xattr integration
+- [ ] Add an action palette like VS Code's etc.
 
 ## File viewer
 
 - Add "View" to File menu and context menu
+
+## Add AI features
+
+Ideas
+
+- [ ] Smart selection: Instead of RegEx or glob, "Select all error logs from last week that mention 'timeout'.", or
+      "Select all Typescript files that haven't been modified in 6 months and have no imports." -> "Move to /archive".
+- [ ] Select 50 screenshots (ScreenShot 2026-01...). → "Rename these based on what is visible in the pic." →
+      "Login_Page_Error.png", "Dashboard_Dark_Mode.png".
+- [ ] "Organize this" Button: Apply in "Downloads" folder → AI analyzes types and contents, proposes a structure.
+- [ ] "Explain this" in context menu: Right-click a minified JS file, a binary, or a cryptic config -> "Explain what
+      this does."
+- [ ] Add a small local LLM for privacy-conscious users.
