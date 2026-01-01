@@ -14,10 +14,9 @@ if (isDev) {
     args.push('-c', 'src-tauri/tauri.dev.json')
 }
 
-// Spawn the tauri process (relies on pnpm/npm adding node_modules/.bin to PATH)
-const tauriProcess = spawn('tauri', args, {
+// Spawn the tauri process via npx (avoids shell: true deprecation warning)
+const tauriProcess = spawn('npx', ['tauri', ...args], {
     stdio: 'inherit',
-    shell: true,
 })
 
 // Handle process exit
