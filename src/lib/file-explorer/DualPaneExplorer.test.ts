@@ -13,6 +13,8 @@ vi.mock('$lib/app-status-store', () => ({
         rightVolumeId: 'root',
     }),
     saveAppStatus: vi.fn().mockResolvedValue(undefined),
+    getLastUsedPathForVolume: vi.fn().mockResolvedValue(undefined),
+    saveLastUsedPathForVolume: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@tauri-apps/api/event', () => ({
@@ -81,11 +83,13 @@ describe('DualPaneExplorer', () => {
         const target = document.createElement('div')
         mount(DualPaneExplorer, { target })
 
-        // Wait for async initialization (paths, volumes, settings)
-        await tick()
-        await tick()
-        await tick()
-        await tick()
+        // Wait for async initialization (paths, volumes, settings, findContainingVolume)
+        // The initialization now includes more async calls, so we need more ticks
+        for (let i = 0; i < 10; i++) {
+            await tick()
+        }
+        // Small additional delay to ensure all promises resolve
+        await new Promise((resolve) => setTimeout(resolve, 10))
         await tick()
 
         const panes = target.querySelectorAll('.file-pane')

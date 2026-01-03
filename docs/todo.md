@@ -1,10 +1,6 @@
 ## Listing
 
-- [x] Allow user to go up from favorites. In the volume selector, we currently put a tick next to the selected volume,
-      but for favorites, they should never have the checkmark. When selected, the volume containing them should be
-      ticked. And the "root" folder of the favorite should not actually be a root folder, but should contain ".." and
-      act in every way like the volume that contains it. Basically, favorites should just be shortcuts, not volumes.
-- [ ] Save to state the last used directory per volume. Save it to the same state store where we save showHiddenFiles
+- [x] Save to state the last used directory per volume. Save it to the same state store where we save showHiddenFiles
       and the such. Use it when switching volumes. (Favorites are not volumes, they are just shortcuts to directories,
       so their state belongs to the volume that contains them.)
 - [ ] Add Back/Forward feature. I want to add a Back/Forward feature to let the user navigate back and forth between

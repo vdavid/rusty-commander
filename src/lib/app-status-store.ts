@@ -126,6 +126,49 @@ export async function saveAppStatus(status: Partial<AppStatus>): Promise<void> {
         if (status.rightVolumeId !== undefined) {
             await store.set('rightVolumeId', status.rightVolumeId)
         }
+        await store.save()
+    } catch {
+        // Silently fail - persistence is nice-to-have
+    }
+}
+
+/** Map of volumeId -> last used path for that volume */
+export type VolumePathMap = Record<string, string>
+
+function isValidPathMap(value: unknown): value is VolumePathMap {
+    if (typeof value !== 'object' || value === null) return false
+    return Object.entries(value).every(([k, v]) => typeof k === 'string' && typeof v === 'string')
+}
+
+/**
+ * Gets the last used path for a specific volume.
+ * Returns undefined if no path is stored.
+ */
+export async function getLastUsedPathForVolume(volumeId: string): Promise<string | undefined> {
+    try {
+        const store = await getStore()
+        const lastUsedPaths = await store.get('lastUsedPaths')
+        if (isValidPathMap(lastUsedPaths)) {
+            return lastUsedPaths[volumeId]
+        }
+        return undefined
+    } catch {
+        return undefined
+    }
+}
+
+/**
+ * Saves the last used path for a specific volume.
+ * This is more efficient than loading/saving the full status.
+ */
+export async function saveLastUsedPathForVolume(volumeId: string, path: string): Promise<void> {
+    try {
+        const store = await getStore()
+        const lastUsedPaths = await store.get('lastUsedPaths')
+        const paths: VolumePathMap = isValidPathMap(lastUsedPaths) ? lastUsedPaths : {}
+        paths[volumeId] = path
+        await store.set('lastUsedPaths', paths)
+        await store.save()
     } catch {
         // Silently fail - persistence is nice-to-have
     }

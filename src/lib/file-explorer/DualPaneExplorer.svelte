@@ -2,13 +2,20 @@
     import { onMount, onDestroy } from 'svelte'
     import FilePane from './FilePane.svelte'
     import LoadingIcon from '../LoadingIcon.svelte'
-    import { loadAppStatus, saveAppStatus, type ViewMode } from '$lib/app-status-store'
+    import {
+        loadAppStatus,
+        saveAppStatus,
+        getLastUsedPathForVolume,
+        saveLastUsedPathForVolume,
+        type ViewMode,
+    } from '$lib/app-status-store'
     import { loadSettings, saveSettings, subscribeToSettingsChanges } from '$lib/settings-store'
     import {
         pathExists,
         listen,
         listVolumes,
         getDefaultVolumeId,
+        findContainingVolume,
         DEFAULT_VOLUME_ID,
         type UnlistenFn,
     } from '$lib/tauri-commands'
@@ -40,6 +47,7 @@
     function handleLeftPathChange(path: string) {
         leftPath = path
         void saveAppStatus({ leftPath: path })
+        void saveLastUsedPathForVolume(leftVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
         containerElement?.focus()
     }
@@ -47,20 +55,55 @@
     function handleRightPathChange(path: string) {
         rightPath = path
         void saveAppStatus({ rightPath: path })
+        void saveLastUsedPathForVolume(rightVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
         containerElement?.focus()
     }
 
-    function handleLeftVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
+    async function handleLeftVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
+        // Save the current path for the old volume before switching
+        void saveLastUsedPathForVolume(leftVolumeId, leftPath)
+
+        const pathToNavigate = await determineNavigationPath(volumeId, volumePath, targetPath)
+
         leftVolumeId = volumeId
-        leftPath = targetPath
-        void saveAppStatus({ leftVolumeId: volumeId, leftPath: targetPath })
+        leftPath = pathToNavigate
+        void saveAppStatus({ leftVolumeId: volumeId, leftPath: pathToNavigate })
     }
 
-    function handleRightVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
+    async function handleRightVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
+        // Save the current path for the old volume before switching
+        void saveLastUsedPathForVolume(rightVolumeId, rightPath)
+
+        const pathToNavigate = await determineNavigationPath(volumeId, volumePath, targetPath)
+
         rightVolumeId = volumeId
-        rightPath = targetPath
-        void saveAppStatus({ rightVolumeId: volumeId, rightPath: targetPath })
+        rightPath = pathToNavigate
+        void saveAppStatus({ rightVolumeId: volumeId, rightPath: pathToNavigate })
+    }
+
+    /**
+     * Determines which path to navigate to when switching volumes.
+     * - If targetPath !== volumePath: user selected a favorite → go there directly
+     * - Otherwise: look up last used path, or default to ~ for main volume, volume root for others
+     */
+    async function determineNavigationPath(volumeId: string, volumePath: string, targetPath: string): Promise<string> {
+        // User selected a favorite - go to the favorite's path directly
+        if (targetPath !== volumePath) {
+            return targetPath
+        }
+
+        // Look up the last used path for this volume
+        const lastUsedPath = await getLastUsedPathForVolume(volumeId)
+        if (lastUsedPath && (await pathExists(lastUsedPath))) {
+            return lastUsedPath
+        }
+
+        // Default: ~ for main volume (root), volume path for others
+        if (volumeId === DEFAULT_VOLUME_ID) {
+            return '~'
+        }
+        return volumePath
     }
 
     function handleLeftFocus() {
@@ -126,10 +169,15 @@
         leftViewMode = status.leftViewMode
         rightViewMode = status.rightViewMode
 
-        // Validate persisted volume IDs exist, fallback to default if not
+        // Determine the correct volume IDs by finding which volume contains each path
+        // This is more reliable than trusting the stored volumeId, which may be stale
         const defaultId = await getDefaultVolumeId()
-        leftVolumeId = volumes.some((v) => v.id === status.leftVolumeId) ? status.leftVolumeId : defaultId
-        rightVolumeId = volumes.some((v) => v.id === status.rightVolumeId) ? status.rightVolumeId : defaultId
+        const [leftContaining, rightContaining] = await Promise.all([
+            findContainingVolume(status.leftPath),
+            findContainingVolume(status.rightPath),
+        ])
+        leftVolumeId = leftContaining?.id ?? defaultId
+        rightVolumeId = rightContaining?.id ?? defaultId
 
         initialized = true
 
