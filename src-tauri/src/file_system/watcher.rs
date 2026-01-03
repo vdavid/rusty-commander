@@ -144,7 +144,10 @@ fn handle_directory_change(listing_id: &str) {
     let new_entries = match list_directory_core(&path) {
         Ok(entries) => entries,
         Err(e) => {
-            eprintln!("[WATCHER] Failed to re-read directory: {}", e);
+            // Silently ignore permission denied - user may have revoked access
+            if e.kind() != std::io::ErrorKind::PermissionDenied {
+                eprintln!("[WATCHER] Failed to re-read directory: {}", e);
+            }
             return;
         }
     };

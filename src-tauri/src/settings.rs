@@ -8,17 +8,39 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
+/// User's choice regarding full disk access permission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FullDiskAccessChoice {
+    /// User clicked "Open System Settings" (presumably granted)
+    Allow,
+    /// User clicked "Deny" - don't ask again
+    Deny,
+    /// First launch, haven't shown prompt yet
+    NotAskedYet,
+}
+
+impl Default for FullDiskAccessChoice {
+    fn default() -> Self {
+        Self::NotAskedYet
+    }
+}
+
 /// User settings structure, matching the frontend settings-store.ts
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub show_hidden_files: bool,
+    #[serde(default)]
+    #[allow(dead_code)] // Only used by frontend, backend just persists it
+    pub full_disk_access_choice: FullDiskAccessChoice,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            show_hidden_files: true, // Default: show hidden files
+            show_hidden_files: true,
+            full_disk_access_choice: FullDiskAccessChoice::NotAskedYet,
         }
     }
 }

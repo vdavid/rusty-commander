@@ -357,11 +357,6 @@
         void fetchVisibleRange()
     })
 
-    // Returns paths of currently visible files (for sync status polling)
-    export function getVisiblePaths(): string[] {
-        return visibleColumns.flatMap((col) => col.files.map((f) => f.file.path))
-    }
-
     // Track previous container height to detect resizes
     let prevContainerHeight = 0
 
@@ -443,12 +438,11 @@
 
 <style>
     .brief-list {
-        margin: 0;
-        padding: 0;
         overflow-x: auto;
         overflow-y: hidden;
-        font-family: var(--font-system) sans-serif;
+        font-family: var(--font-system), sans-serif;
         font-size: var(--font-size-sm);
+        line-height: 1;
         flex: 1;
         outline: none;
     }
@@ -471,14 +465,13 @@
     }
 
     .file-entry {
-        padding: var(--spacing-xxs) var(--spacing-sm);
         display: flex;
-        align-items: center;
+        height: 20px;
+        padding: var(--spacing-xxs) var(--spacing-sm);
         gap: var(--spacing-sm);
+        align-items: center;
         white-space: nowrap;
         overflow: hidden;
-        height: 20px;
-        box-sizing: border-box;
     }
 
     .file-entry.is-selected {
@@ -535,6 +528,7 @@
     .name {
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     @media (prefers-color-scheme: dark) {

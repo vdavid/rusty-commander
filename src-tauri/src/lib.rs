@@ -19,6 +19,8 @@ pub mod icons;
 #[cfg(target_os = "macos")]
 mod macos_icons;
 mod menu;
+#[cfg(target_os = "macos")]
+mod permissions;
 mod settings;
 #[cfg(target_os = "macos")]
 mod volumes;
@@ -142,7 +144,11 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             commands::volumes::list_volumes,
             #[cfg(target_os = "macos")]
-            commands::volumes::get_default_volume_id
+            commands::volumes::get_default_volume_id,
+            #[cfg(target_os = "macos")]
+            permissions::check_full_disk_access,
+            #[cfg(target_os = "macos")]
+            permissions::open_privacy_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

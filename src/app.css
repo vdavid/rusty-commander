@@ -32,6 +32,7 @@
     --color-focus-border: #0078d4;
 
     /* === Semantic Colors === */
+    --color-allow: #2e7d32;
     --color-error: #d32f2f;
 
     /* === Size tier colors (20% offset toward target color) === */
@@ -51,7 +52,7 @@
     --font-mono: 'SF Mono', Monaco, monospace;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.75rem;
-    --font-size-base: 0.875rem;
+    --font-size-base: 1rem;
 }
 
 /* Dark Mode - automatically applied when user's system prefers dark mode */
@@ -80,13 +81,211 @@
 }
 
 /* =============================================================================
+   Reset from https://github.com/filipelinhares/ress/blob/master/dist/ress.min.css with some stripping
+   ============================================================================= */
+
+@layer ress-reset {
+    html {
+        -webkit-text-size-adjust: 100%;
+        box-sizing: border-box;
+        tab-size: 4;
+        word-break: normal;
+    }
+
+    *,
+    :after,
+    :before {
+        background-repeat: no-repeat;
+        box-sizing: inherit;
+    }
+
+    :after,
+    :before {
+        text-decoration: inherit;
+        vertical-align: inherit;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+    }
+
+    hr {
+        color: inherit;
+        height: 0;
+        overflow: visible;
+    }
+
+    details,
+    main {
+        display: block;
+    }
+
+    summary {
+        display: list-item;
+    }
+
+    abbr[title] {
+        border-bottom: none;
+        text-decoration: underline dotted;
+    }
+
+    a {
+        background-color: transparent;
+    }
+
+    a:active,
+    a:hover {
+        outline-width: 0;
+    }
+
+    code,
+    kbd,
+    pre,
+    samp {
+        font-family: monospace, monospace;
+    }
+
+    pre {
+        font-size: 1em;
+    }
+
+    b,
+    strong {
+        font-weight: bolder;
+    }
+
+    sub,
+    sup {
+        font-size: 75%;
+        line-height: 0;
+        position: relative;
+        vertical-align: baseline;
+    }
+
+    sub {
+        bottom: -0.25em;
+    }
+
+    sup {
+        top: -0.5em;
+    }
+
+    table {
+        border-color: inherit;
+        text-indent: 0;
+    }
+
+    iframe {
+        border-style: none;
+    }
+
+    input {
+        border-radius: 0;
+    }
+
+    textarea {
+        overflow: auto;
+        resize: vertical;
+    }
+
+    button,
+    input,
+    optgroup,
+    select,
+    textarea {
+        font: inherit;
+    }
+
+    optgroup {
+        font-weight: 700;
+    }
+
+    button {
+        overflow: visible;
+    }
+
+    button,
+    select {
+        text-transform: none;
+    }
+
+    [role='button'],
+    [type='button'],
+    [type='reset'],
+    [type='submit'],
+    button {
+        cursor: pointer;
+    }
+
+    [type='reset'],
+    [type='submit'],
+    button,
+    html [type='button'] {
+        appearance: button;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        background-color: transparent;
+        border-style: none;
+    }
+
+    a:focus,
+    button:focus,
+    input:focus,
+    select:focus,
+    textarea:focus {
+        outline-width: 0;
+    }
+
+    progress {
+        vertical-align: baseline;
+    }
+}
+
+/* =============================================================================
    Global Styles
    ============================================================================= */
 
+@layer typography {
+    ul,
+    ol,
+    dl {
+        list-style-position: inside;
+        padding-inline-start: 1lh;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        text-wrap: balance;
+    }
+
+    p {
+        text-wrap: pretty;
+        margin-block-start: 1rem;
+        margin-block-end: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    html {
+        interpolate-size: allow-keywords;
+    }
+}
+
+html {
+    font-size: clamp(1rem, 1rem + 0.5vw, 2rem);
+}
+
 html,
 body {
-    margin: 0;
-    padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -97,6 +296,7 @@ body {
     -webkit-user-select: none;
     /* Force default cursor everywhere */
     cursor: default;
+    font-size: var(--font-size-base);
 }
 
 #app {

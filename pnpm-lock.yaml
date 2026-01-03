@@ -11,6 +11,9 @@ importers:
       '@crabnebula/tauri-plugin-drag':
         specifier: ^2.1.0
         version: 2.1.0
+      '@lottiefiles/dotlottie-svelte':
+        specifier: ^0.8.12
+        version: 0.8.12(svelte@5.46.1)
       '@tauri-apps/api':
         specifier: ^2
         version: 2.9.1
@@ -404,6 +407,14 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@lottiefiles/dotlottie-svelte@0.8.12':
+    resolution: {integrity: sha512-SOripnlaEdkf8/uq99t/rR3x6EYSvcubmJjGoL4XU+S1Yvm6LgEZ/s5ZXEeBELVXLH2vH8FjFu+GP24LZc7b8g==}
+    peerDependencies:
+      svelte: ^4.0.0 || ^5.0.0
+
+  '@lottiefiles/dotlottie-web@0.60.0':
+    resolution: {integrity: sha512-AbQYmyZ8ZihCGPwjdN0e7bJ7W7yVmHG24IXn8kxyFJJNJmSJEaarpOSivu/1KoFGiw86OMmiWcLXrPs1XjT6Qw==}
 
   '@napi-rs/wasm-runtime@1.1.0':
     resolution: {integrity: sha512-Fq6DJW+Bb5jaWE69/qOE0D1TUN9+6uWhCeZpdnSBk14pjLcCWR7Q8n49PTSPHazM37JqrsdpEthXy2xn6jWWiA==}
@@ -2157,6 +2168,13 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lottiefiles/dotlottie-svelte@0.8.12(svelte@5.46.1)':
+    dependencies:
+      '@lottiefiles/dotlottie-web': 0.60.0
+      svelte: 5.46.1
+
+  '@lottiefiles/dotlottie-web@0.60.0': {}
 
   '@napi-rs/wasm-runtime@1.1.0':
     dependencies:

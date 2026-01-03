@@ -313,11 +313,6 @@
         void fetchVisibleRange()
     })
 
-    // Returns paths of currently visible files (for sync status polling)
-    export function getVisiblePaths(): string[] {
-        return visibleFiles.map((f) => f.file.path)
-    }
-
     // Returns the number of visible items (for Page Up/Down navigation)
     export function getVisibleItemsCount(): number {
         return Math.ceil(containerHeight / ROW_HEIGHT)
@@ -360,7 +355,7 @@
                     role="option"
                     aria-selected={globalIndex === selectedIndex}
                 >
-                    <span class="col-icon">
+                    <span class="icon-wrapper">
                         {#if getIconUrl(file)}
                             <img class="icon" src={getIconUrl(file)} alt="" width="16" height="16" />
                         {:else}
@@ -379,9 +374,7 @@
                             />
                         {/if}
                     </span>
-                    <span class="col-name">
-                        <span class="name-text">{file.name}</span>
-                    </span>
+                    <span class="col-name">{file.name}</span>
                     <span class="col-size" title={file.size !== undefined ? formatHumanReadable(file.size) : ''}>
                         {#if file.isDirectory}
                             <span class="size-dir">&lt;dir&gt;</span>
@@ -400,12 +393,11 @@
 
 <style>
     .full-list {
-        margin: 0;
-        padding: 0;
         overflow-y: auto;
         overflow-x: hidden;
         font-family: var(--font-system), sans-serif;
         font-size: var(--font-size-sm);
+        line-height: 1;
         flex: 1;
         outline: none;
     }
@@ -420,12 +412,11 @@
 
     .file-entry {
         display: grid;
-        grid-template-columns: 16px 1fr 85px 120px;
+        height: 20px;
+        padding: var(--spacing-xxs) var(--spacing-sm);
         gap: var(--spacing-sm);
         align-items: center;
-        padding: var(--spacing-xxs) var(--spacing-sm);
-        height: 20px;
-        box-sizing: border-box;
+        grid-template-columns: 16px 1fr 85px 120px;
     }
 
     .file-entry.is-selected {
@@ -436,13 +427,11 @@
         background-color: var(--color-selection-bg);
     }
 
-    .col-icon {
+    .icon-wrapper {
         position: relative;
         width: 16px;
         height: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        flex-shrink: 0;
     }
 
     .icon {
@@ -453,6 +442,9 @@
 
     .icon-emoji {
         font-size: var(--font-size-sm);
+        width: 16px;
+        text-align: center;
+        display: block;
     }
 
     .symlink-badge {
@@ -479,13 +471,6 @@
     }
 
     .col-name {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-xs);
-        min-width: 0;
-    }
-
-    .name-text {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

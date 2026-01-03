@@ -261,27 +261,6 @@ describe('BriefList component', () => {
 
             expect(typeof (component as unknown as Record<string, unknown>).scrollToIndex).toBe('function')
         })
-
-        it('exports getVisiblePaths method', async () => {
-            const component = mount(BriefList, {
-                target,
-                props: {
-                    listingId: 'test-visible-paths',
-                    totalCount: 10,
-                    includeHidden: true,
-                    selectedIndex: 0,
-                    isFocused: true,
-                    hasParent: false,
-                    parentPath: '/',
-                    onSelect: vi.fn(),
-                    onNavigate: vi.fn(),
-                },
-            })
-
-            await tick()
-
-            expect(typeof (component as unknown as Record<string, unknown>).getVisiblePaths).toBe('function')
-        })
     })
 
     describe('Props validation', () => {
@@ -414,27 +393,6 @@ describe('FullList component', () => {
             await tick()
 
             expect(typeof (component as unknown as Record<string, unknown>).scrollToIndex).toBe('function')
-        })
-
-        it('exports getVisiblePaths method', async () => {
-            const component = mount(FullList, {
-                target,
-                props: {
-                    listingId: 'test-full-visible',
-                    totalCount: 10,
-                    includeHidden: true,
-                    selectedIndex: 0,
-                    isFocused: true,
-                    hasParent: false,
-                    parentPath: '/',
-                    onSelect: vi.fn(),
-                    onNavigate: vi.fn(),
-                },
-            })
-
-            await tick()
-
-            expect(typeof (component as unknown as Record<string, unknown>).getVisiblePaths).toBe('function')
         })
     })
 })

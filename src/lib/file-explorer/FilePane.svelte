@@ -20,6 +20,7 @@
     import SelectionInfo from './SelectionInfo.svelte'
     import LoadingIcon from '../LoadingIcon.svelte'
     import VolumeBreadcrumb from './VolumeBreadcrumb.svelte'
+    import PermissionDeniedPane from './PermissionDeniedPane.svelte'
     import * as benchmark from '$lib/benchmark'
     import { handleNavigationShortcut } from './keyboard-shortcuts'
 
@@ -86,6 +87,11 @@
 
     // Derive includeHidden from showHiddenFiles prop
     const includeHidden = $derived(showHiddenFiles)
+
+    // Check if error is a permission denied error
+    const isPermissionDenied = $derived(
+        error !== null && (error.includes('Permission denied') || error.includes('os error 13')),
+    )
 
     // Create ".." entry for parent navigation
     function createParentEntry(path: string): FileEntry | null {
@@ -492,6 +498,8 @@
     <div class="content">
         {#if loading}
             <LoadingIcon />
+        {:else if isPermissionDenied}
+            <PermissionDeniedPane folderPath={currentPath} />
         {:else if error}
             <div class="error-message">{error}</div>
         {:else if viewMode === 'brief'}
@@ -545,7 +553,7 @@
     }
 
     .header {
-        padding: var(--spacing-sm);
+        padding: 2px var(--spacing-sm);
         background-color: var(--color-bg-secondary);
         border-bottom: 1px solid var(--color-border-primary);
         font-size: var(--font-size-xs);

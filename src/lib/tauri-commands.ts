@@ -211,3 +211,33 @@ export async function getDefaultVolumeId(): Promise<string> {
         return DEFAULT_VOLUME_ID
     }
 }
+
+// ============================================================================
+// Permission checking (macOS only)
+// ============================================================================
+
+/**
+ * Checks if the app has full disk access.
+ * Only available on macOS.
+ * @returns True if the app has FDA, false otherwise
+ */
+export async function checkFullDiskAccess(): Promise<boolean> {
+    try {
+        return await invoke<boolean>('check_full_disk_access')
+    } catch {
+        // Command not available (non-macOS) - assume we have access
+        return true
+    }
+}
+
+/**
+ * Opens System Settings > Privacy & Security > Privacy.
+ * Only available on macOS.
+ */
+export async function openPrivacySettings(): Promise<void> {
+    try {
+        await invoke('open_privacy_settings')
+    } catch {
+        // Command not available (non-macOS) - silently fail
+    }
+}
