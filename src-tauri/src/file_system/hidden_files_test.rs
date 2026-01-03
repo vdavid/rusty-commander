@@ -4,8 +4,8 @@
 //! files starting with "." from directory listings.
 
 use super::operations::{
-    CachedListing, FileEntry, LISTING_CACHE, find_file_index, get_file_at, get_file_range, get_total_count,
-    list_directory_end,
+    CachedListing, FileEntry, LISTING_CACHE, SortColumn, SortOrder, find_file_index, get_file_at, get_file_range,
+    get_total_count, list_directory_end,
 };
 use super::volume::{InMemoryVolume, Volume};
 use std::path::Path;
@@ -65,6 +65,8 @@ fn test_get_total_count_with_hidden_includes_all() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -93,6 +95,8 @@ fn test_get_total_count_without_hidden_excludes_dot_files() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -125,6 +129,8 @@ fn test_get_file_range_with_hidden_returns_all() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -158,6 +164,8 @@ fn test_get_file_range_without_hidden_excludes_dot_files() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -195,6 +203,8 @@ fn test_get_file_range_pagination_respects_hidden_filter() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -239,6 +249,8 @@ fn test_find_file_index_hidden_file_with_hidden_enabled() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -266,6 +278,8 @@ fn test_find_file_index_hidden_file_with_hidden_disabled() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -293,6 +307,8 @@ fn test_find_file_index_visible_file_index_changes_with_hidden_setting() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -337,6 +353,8 @@ fn test_get_file_at_index_0_with_hidden_enabled() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -370,6 +388,8 @@ fn test_get_file_at_index_0_with_hidden_disabled() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -412,6 +432,8 @@ fn test_directory_with_only_hidden_files() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }
@@ -444,6 +466,8 @@ fn test_directory_with_no_hidden_files() {
                 volume_id: "test".to_string(),
                 path: std::path::PathBuf::from("/"),
                 entries,
+                sort_by: SortColumn::Name,
+                sort_order: SortOrder::Ascending,
             },
         );
     }

@@ -3,7 +3,15 @@
 import { invoke } from '@tauri-apps/api/core'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event'
-import type { FileEntry, ListingStartResult, SyncStatus, VolumeInfo } from './file-explorer/types'
+import type {
+    FileEntry,
+    ListingStartResult,
+    ResortResult,
+    SortColumn,
+    SortOrder,
+    SyncStatus,
+    VolumeInfo,
+} from './file-explorer/types'
 
 export type { Event, UnlistenFn }
 export { listen }
@@ -18,9 +26,36 @@ export { listen }
  * Frontend then fetches visible ranges on demand via getFileRange.
  * @param path - Directory path to list. Supports tilde expansion (~).
  * @param includeHidden - Whether to include hidden files in total count.
+ * @param sortBy - Column to sort by.
+ * @param sortOrder - Ascending or descending.
  */
-export async function listDirectoryStart(path: string, includeHidden: boolean): Promise<ListingStartResult> {
-    return invoke<ListingStartResult>('list_directory_start', { path, includeHidden })
+export async function listDirectoryStart(
+    path: string,
+    includeHidden: boolean,
+    sortBy: SortColumn,
+    sortOrder: SortOrder,
+): Promise<ListingStartResult> {
+    return invoke<ListingStartResult>('list_directory_start', { path, includeHidden, sortBy, sortOrder })
+}
+
+/**
+ * Re-sorts an existing cached listing in-place.
+ * More efficient than creating a new listing when you just want to change the sort order.
+ * @param listingId - The listing ID from listDirectoryStart.
+ * @param sortBy - Column to sort by.
+ * @param sortOrder - Ascending or descending.
+ * @param cursorFilename - Optional filename to track; returns its new index after sorting.
+ * @param includeHidden - Whether to include hidden files when calculating cursor index.
+ * @public
+ */
+export async function resortListing(
+    listingId: string,
+    sortBy: SortColumn,
+    sortOrder: SortOrder,
+    cursorFilename: string | undefined,
+    includeHidden: boolean,
+): Promise<ResortResult> {
+    return invoke<ResortResult>('resort_listing', { listingId, sortBy, sortOrder, cursorFilename, includeHidden })
 }
 
 /**

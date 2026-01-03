@@ -1,9 +1,10 @@
 //! Tauri commands for file system operations.
 
 use crate::file_system::{
-    FileEntry, ListingStartResult, find_file_index as ops_find_file_index, get_file_at as ops_get_file_at,
-    get_file_range as ops_get_file_range, get_total_count as ops_get_total_count,
-    list_directory_end as ops_list_directory_end, list_directory_start as ops_list_directory_start,
+    FileEntry, ListingStartResult, ResortResult, SortColumn, SortOrder, find_file_index as ops_find_file_index,
+    get_file_at as ops_get_file_at, get_file_range as ops_get_file_range, get_total_count as ops_get_total_count,
+    list_directory_end as ops_list_directory_end,
+    list_directory_start_with_volume as ops_list_directory_start_with_volume, resort_listing as ops_resort_listing,
 };
 use std::path::PathBuf;
 
@@ -33,12 +34,44 @@ pub fn path_exists(path: String) -> bool {
 /// # Arguments
 /// * `path` - The directory path to list. Supports tilde expansion (~).
 /// * `include_hidden` - Whether to include hidden files in total count.
+/// * `sort_by` - Column to sort by (name, extension, size, modified, created).
+/// * `sort_order` - Ascending or descending.
 #[tauri::command]
-pub fn list_directory_start(path: String, include_hidden: bool) -> Result<ListingStartResult, String> {
+pub fn list_directory_start(
+    path: String,
+    include_hidden: bool,
+    sort_by: SortColumn,
+    sort_order: SortOrder,
+) -> Result<ListingStartResult, String> {
     let expanded_path = expand_tilde(&path);
     let path_buf = PathBuf::from(&expanded_path);
-    ops_list_directory_start(&path_buf, include_hidden)
+    ops_list_directory_start_with_volume("root", &path_buf, include_hidden, sort_by, sort_order)
         .map_err(|e| format!("Failed to start directory listing '{}': {}", path, e))
+}
+
+/// Re-sorts an existing cached listing in-place.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID from `list_directory_start`.
+/// * `sort_by` - Column to sort by.
+/// * `sort_order` - Ascending or descending.
+/// * `cursor_filename` - Optional filename to track; returns its new index after sorting.
+/// * `include_hidden` - Whether to include hidden files when calculating cursor index.
+#[tauri::command]
+pub fn resort_listing(
+    listing_id: String,
+    sort_by: SortColumn,
+    sort_order: SortOrder,
+    cursor_filename: Option<String>,
+    include_hidden: bool,
+) -> Result<ResortResult, String> {
+    ops_resort_listing(
+        &listing_id,
+        sort_by,
+        sort_order,
+        cursor_filename.as_deref(),
+        include_hidden,
+    )
 }
 
 /// Gets a range of entries from a cached listing.

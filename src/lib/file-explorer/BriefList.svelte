@@ -1,10 +1,11 @@
 <script lang="ts">
-    import type { FileEntry, SyncStatus } from './types'
+    import type { FileEntry, SortColumn, SortOrder, SyncStatus } from './types'
     import { getCachedIcon, iconCacheVersion, prefetchIcons } from '$lib/icon-cache'
     import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
     import { getFileRange } from '$lib/tauri-commands'
     import { handleNavigationShortcut } from './keyboard-shortcuts'
     import { startDragTracking } from '$lib/drag-drop'
+    import SortableHeader from './SortableHeader.svelte'
 
     /** Prefetch buffer - load this many items around visible range */
     const PREFETCH_BUFFER = 200
@@ -13,32 +14,40 @@
         listingId: string
         totalCount: number
         includeHidden: boolean
+        cacheGeneration?: number
         selectedIndex: number
         isFocused?: boolean
         syncStatusMap?: Record<string, SyncStatus>
         hasParent: boolean
         parentPath: string
         maxFilenameWidth?: number // From backend font metrics, if available
+        sortBy: SortColumn
+        sortOrder: SortOrder
         onSelect: (index: number) => void
         onNavigate: (entry: FileEntry) => void
         onContextMenu?: (entry: FileEntry) => void
         onSyncStatusRequest?: (paths: string[]) => void
+        onSortChange?: (column: SortColumn) => void
     }
 
     const {
         listingId,
         totalCount,
         includeHidden,
+        cacheGeneration = 0,
         selectedIndex,
         isFocused = true,
         syncStatusMap = {},
         hasParent,
         parentPath,
         maxFilenameWidth: backendMaxWidth,
+        sortBy,
+        sortOrder,
         onSelect,
         onNavigate,
         onContextMenu,
         onSyncStatusRequest,
+        onSortChange,
     }: Props = $props()
 
     // ==== Cached entries (prefetch buffer) ====
@@ -340,28 +349,33 @@
     let prevListingId = ''
     let prevIncludeHidden = false
     let prevTotalCount = 0
+    let prevCacheGeneration = 0
 
-    // Single effect: fetch when ready, reset cache only when listingId/includeHidden/totalCount actually changes
+    // Single effect: fetch when ready, reset cache when listingId/includeHidden/totalCount/cacheGeneration changes
     $effect(() => {
         // Read reactive dependencies
         const currentListingId = listingId
         const currentIncludeHidden = includeHidden
         const currentTotalCount = totalCount
+        const currentCacheGeneration = cacheGeneration
         if (!currentListingId || containerHeight <= 0) return
 
-        // Check if listingId, includeHidden, or totalCount actually changed
+        // Check if any tracked prop changed
         // totalCount changes when files are added/removed by the file watcher
+        // cacheGeneration changes when sorting is changed (forces re-fetch)
         if (
             currentListingId !== prevListingId ||
             currentIncludeHidden !== prevIncludeHidden ||
-            currentTotalCount !== prevTotalCount
+            currentTotalCount !== prevTotalCount ||
+            currentCacheGeneration !== prevCacheGeneration
         ) {
-            // Reset cache for new listing, filter change, or file count change
+            // Reset cache for new listing, filter change, file count change, or cache invalidation
             cachedEntries = []
             cachedRange = { start: 0, end: 0 }
             prevListingId = currentListingId
             prevIncludeHidden = currentIncludeHidden
             prevTotalCount = currentTotalCount
+            prevCacheGeneration = currentCacheGeneration
         }
 
         void fetchVisibleRange()
@@ -382,71 +396,136 @@
     })
 </script>
 
-<div
-    class="brief-list"
-    class:is-focused={isFocused}
-    bind:this={scrollContainer}
-    bind:clientHeight={containerHeight}
-    bind:clientWidth={containerWidth}
-    onscroll={handleScroll}
-    tabindex="-1"
-    role="listbox"
-    aria-activedescendant={selectedIndex >= 0 ? `file-${String(selectedIndex)}` : undefined}
->
-    <!-- Spacer div provides accurate scrollbar for full list width -->
-    <div class="virtual-spacer" style="width: {virtualWindow.totalSize}px; height: 100%;">
-        <!-- Visible window positioned with translateX -->
-        <div class="virtual-window" style="transform: translateX({virtualWindow.offset}px);">
-            {#each visibleColumns as column (column.columnIndex)}
-                <div class="column" style="width: {maxFilenameWidth}px;">
-                    {#each column.files as { file, globalIndex } (file.path)}
-                        {@const syncIcon = getSyncIconPath(syncStatusMap[file.path])}
-                        <!-- svelte-ignore a11y_click_events_have_key_events,a11y_interactive_supports_focus -->
-                        <div
-                            id={`file-${String(globalIndex)}`}
-                            class="file-entry"
-                            class:is-directory={file.isDirectory}
-                            class:is-selected={globalIndex === selectedIndex}
-                            onmousedown={(e: MouseEvent) => {
-                                handleMouseDown(e, globalIndex)
-                            }}
-                            onclick={() => {
-                                handleClick(globalIndex)
-                            }}
-                            ondblclick={() => {
-                                handleDoubleClick(globalIndex)
-                            }}
-                            oncontextmenu={(e: MouseEvent) => {
-                                e.preventDefault()
-                                onSelect(globalIndex)
-                                onContextMenu?.(file)
-                            }}
-                            role="option"
-                            aria-selected={globalIndex === selectedIndex}
-                        >
-                            <span class="icon-wrapper">
-                                {#if getIconUrl(file)}
-                                    <img class="icon" src={getIconUrl(file)} alt="" width="16" height="16" />
-                                {:else}
-                                    <span class="icon-emoji">{getFallbackEmoji(file)}</span>
-                                {/if}
-                                {#if file.isSymlink}
-                                    <span class="symlink-badge" class:has-sync={!!syncIcon}>🔗</span>
-                                {/if}
-                                {#if syncIcon}
-                                    <img class="sync-badge" src={syncIcon} alt="" width="10" height="10" />
-                                {/if}
-                            </span>
-                            <span class="name">{file.name}</span>
-                        </div>
-                    {/each}
-                </div>
-            {/each}
+<div class="brief-list-container" class:is-focused={isFocused}>
+    <!-- Header row with sort options -->
+    <div class="header-row" role="row">
+        <SortableHeader
+            column="name"
+            label="Name"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={(col: SortColumn) => onSortChange?.(col)}
+        />
+        <SortableHeader
+            column="extension"
+            label="Ext"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={(col: SortColumn) => onSortChange?.(col)}
+        />
+        <SortableHeader
+            column="size"
+            label="Size"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={(col: SortColumn) => onSortChange?.(col)}
+        />
+        <SortableHeader
+            column="modified"
+            label="Modified"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={(col: SortColumn) => onSortChange?.(col)}
+        />
+        <SortableHeader
+            column="created"
+            label="Created"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={(col: SortColumn) => onSortChange?.(col)}
+        />
+    </div>
+
+    <!-- Scrollable file list -->
+    <div
+        class="brief-list"
+        bind:this={scrollContainer}
+        bind:clientHeight={containerHeight}
+        bind:clientWidth={containerWidth}
+        onscroll={handleScroll}
+        tabindex="-1"
+        role="listbox"
+        aria-activedescendant={selectedIndex >= 0 ? `file-${String(selectedIndex)}` : undefined}
+    >
+        <!-- Spacer div provides accurate scrollbar for full list width -->
+        <div class="virtual-spacer" style="width: {virtualWindow.totalSize}px; height: 100%;">
+            <!-- Visible window positioned with translateX -->
+            <div class="virtual-window" style="transform: translateX({virtualWindow.offset}px);">
+                {#each visibleColumns as column (column.columnIndex)}
+                    <div class="column" style="width: {maxFilenameWidth}px;">
+                        {#each column.files as { file, globalIndex } (file.path)}
+                            {@const syncIcon = getSyncIconPath(syncStatusMap[file.path])}
+                            <!-- svelte-ignore a11y_click_events_have_key_events,a11y_interactive_supports_focus -->
+                            <div
+                                id={`file-${String(globalIndex)}`}
+                                class="file-entry"
+                                class:is-directory={file.isDirectory}
+                                class:is-selected={globalIndex === selectedIndex}
+                                onmousedown={(e: MouseEvent) => {
+                                    handleMouseDown(e, globalIndex)
+                                }}
+                                onclick={() => {
+                                    handleClick(globalIndex)
+                                }}
+                                ondblclick={() => {
+                                    handleDoubleClick(globalIndex)
+                                }}
+                                oncontextmenu={(e: MouseEvent) => {
+                                    e.preventDefault()
+                                    onSelect(globalIndex)
+                                    onContextMenu?.(file)
+                                }}
+                                role="option"
+                                aria-selected={globalIndex === selectedIndex}
+                            >
+                                <span class="icon-wrapper">
+                                    {#if getIconUrl(file)}
+                                        <img class="icon" src={getIconUrl(file)} alt="" width="16" height="16" />
+                                    {:else}
+                                        <span class="icon-emoji">{getFallbackEmoji(file)}</span>
+                                    {/if}
+                                    {#if file.isSymlink}
+                                        <span class="symlink-badge" class:has-sync={!!syncIcon}>🔗</span>
+                                    {/if}
+                                    {#if syncIcon}
+                                        <img class="sync-badge" src={syncIcon} alt="" width="10" height="10" />
+                                    {/if}
+                                </span>
+                                <span class="name">{file.name}</span>
+                            </div>
+                        {/each}
+                    </div>
+                {/each}
+            </div>
         </div>
     </div>
 </div>
 
 <style>
+    .brief-list-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+    }
+
+    .header-row {
+        display: flex;
+        height: 22px;
+        background: var(--color-bg-header);
+        border-bottom: 1px solid var(--color-border);
+        flex-shrink: 0;
+        padding: 0 var(--spacing-xs);
+    }
+
+    /*noinspection CssUnusedSymbol*/
+    .header-row :global(.sortable-header) {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+        text-align: center;
+    }
+
     .brief-list {
         overflow-x: auto;
         overflow-y: hidden;
@@ -488,7 +567,7 @@
         background-color: rgba(204, 228, 247, 0.1);
     }
 
-    .brief-list.is-focused .file-entry.is-selected {
+    .brief-list-container.is-focused .file-entry.is-selected {
         background-color: var(--color-selection-bg);
     }
 

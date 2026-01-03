@@ -2,11 +2,14 @@
 
 import { load } from '@tauri-apps/plugin-store'
 import type { Store } from '@tauri-apps/plugin-store'
+import type { SortColumn, SortOrder } from './file-explorer/types'
+import { defaultSortOrders } from './file-explorer/types'
 
 const STORE_NAME = 'app-status.json'
 const DEFAULT_PATH = '~'
 const ROOT_PATH = '/'
 const DEFAULT_VOLUME_ID = 'root'
+const DEFAULT_SORT_BY: SortColumn = 'name'
 
 export type ViewMode = 'full' | 'brief'
 
@@ -18,6 +21,8 @@ export interface AppStatus {
     rightViewMode: ViewMode
     leftVolumeId: string
     rightVolumeId: string
+    leftSortBy: SortColumn
+    rightSortBy: SortColumn
 }
 
 const DEFAULT_STATUS: AppStatus = {
@@ -28,6 +33,8 @@ const DEFAULT_STATUS: AppStatus = {
     rightViewMode: 'brief',
     leftVolumeId: DEFAULT_VOLUME_ID,
     rightVolumeId: DEFAULT_VOLUME_ID,
+    leftSortBy: DEFAULT_SORT_BY,
+    rightSortBy: DEFAULT_SORT_BY,
 }
 
 let storeInstance: Store | null = null
@@ -71,6 +78,14 @@ function parseViewMode(raw: unknown): ViewMode {
     return raw === 'full' || raw === 'brief' ? raw : 'brief'
 }
 
+function parseSortColumn(raw: unknown): SortColumn {
+    const validColumns: SortColumn[] = ['name', 'extension', 'size', 'modified', 'created']
+    if (typeof raw === 'string' && validColumns.includes(raw as SortColumn)) {
+        return raw as SortColumn
+    }
+    return DEFAULT_SORT_BY
+}
+
 export async function loadAppStatus(pathExists: (p: string) => Promise<boolean>): Promise<AppStatus> {
     try {
         const store = await getStore()
@@ -82,6 +97,8 @@ export async function loadAppStatus(pathExists: (p: string) => Promise<boolean>)
         const rightViewMode = parseViewMode(await store.get('rightViewMode'))
         const leftVolumeId = ((await store.get('leftVolumeId')) as string) || DEFAULT_VOLUME_ID
         const rightVolumeId = ((await store.get('rightVolumeId')) as string) || DEFAULT_VOLUME_ID
+        const leftSortBy = parseSortColumn(await store.get('leftSortBy'))
+        const rightSortBy = parseSortColumn(await store.get('rightSortBy'))
 
         // Resolve paths with fallback
         const resolvedLeftPath = await resolvePathWithFallback(leftPath, pathExists)
@@ -95,6 +112,8 @@ export async function loadAppStatus(pathExists: (p: string) => Promise<boolean>)
             rightViewMode,
             leftVolumeId,
             rightVolumeId,
+            leftSortBy,
+            rightSortBy,
         }
     } catch {
         // If store fails, return defaults
@@ -126,9 +145,63 @@ export async function saveAppStatus(status: Partial<AppStatus>): Promise<void> {
         if (status.rightVolumeId !== undefined) {
             await store.set('rightVolumeId', status.rightVolumeId)
         }
+        if (status.leftSortBy !== undefined) {
+            await store.set('leftSortBy', status.leftSortBy)
+        }
+        if (status.rightSortBy !== undefined) {
+            await store.set('rightSortBy', status.rightSortBy)
+        }
         await store.save()
     } catch {
         // Silently fail - persistence is nice-to-have
+    }
+}
+
+// ============================================================================
+// Column sort order memory (app-wide, per-column)
+// ============================================================================
+
+type ColumnSortOrders = Partial<Record<SortColumn, SortOrder>>
+
+function isValidSortOrders(value: unknown): value is ColumnSortOrders {
+    if (typeof value !== 'object' || value === null) return false
+    const validColumns: string[] = ['name', 'extension', 'size', 'modified', 'created']
+    const validOrders: string[] = ['ascending', 'descending']
+    return Object.entries(value).every(([k, v]) => validColumns.includes(k) && validOrders.includes(v as string))
+}
+
+/**
+ * Gets the remembered sort order for a column.
+ * Returns the default sort order for that column if not previously set.
+ * @public
+ */
+export async function getColumnSortOrder(column: SortColumn): Promise<SortOrder> {
+    try {
+        const store = await getStore()
+        const orders = await store.get('columnSortOrders')
+        if (isValidSortOrders(orders) && orders[column]) {
+            return orders[column]
+        }
+        return defaultSortOrders[column]
+    } catch {
+        return defaultSortOrders[column]
+    }
+}
+
+/**
+ * Saves the sort order for a column (remembered for next time this column is clicked).
+ * @public
+ */
+export async function saveColumnSortOrder(column: SortColumn, order: SortOrder): Promise<void> {
+    try {
+        const store = await getStore()
+        const orders = await store.get('columnSortOrders')
+        const current: ColumnSortOrders = isValidSortOrders(orders) ? orders : {}
+        current[column] = order
+        await store.set('columnSortOrders', current)
+        await store.save()
+    } catch {
+        // Silently fail
     }
 }
 

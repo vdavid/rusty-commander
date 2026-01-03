@@ -7,6 +7,8 @@
         saveAppStatus,
         getLastUsedPathForVolume,
         saveLastUsedPathForVolume,
+        getColumnSortOrder,
+        saveColumnSortOrder,
         type ViewMode,
     } from '$lib/app-status-store'
     import { loadSettings, saveSettings, subscribeToSettingsChanges } from '$lib/settings-store'
@@ -16,10 +18,12 @@
         listVolumes,
         getDefaultVolumeId,
         findContainingVolume,
+        resortListing,
         DEFAULT_VOLUME_ID,
         type UnlistenFn,
     } from '$lib/tauri-commands'
-    import type { VolumeInfo } from './types'
+    import type { VolumeInfo, SortColumn, SortOrder } from './types'
+    import { defaultSortOrders, DEFAULT_SORT_BY } from './types'
     import { ensureFontMetricsLoaded } from '$lib/font-metrics'
     import {
         createHistory,
@@ -42,6 +46,12 @@
     let rightVolumeId = $state(DEFAULT_VOLUME_ID)
     let volumes = $state<VolumeInfo[]>([])
     let initialized = $state(false)
+
+    // Sorting state - per-pane
+    let leftSortBy = $state<SortColumn>(DEFAULT_SORT_BY)
+    let rightSortBy = $state<SortColumn>(DEFAULT_SORT_BY)
+    let leftSortOrder = $state<SortOrder>(defaultSortOrders[DEFAULT_SORT_BY])
+    let rightSortOrder = $state<SortOrder>(defaultSortOrders[DEFAULT_SORT_BY])
 
     let containerElement: HTMLDivElement | undefined = $state()
     let leftPaneRef: FilePane | undefined = $state()
@@ -75,6 +85,93 @@
         void saveLastUsedPathForVolume(rightVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
         containerElement?.focus()
+    }
+
+    /**
+     * Handles sorting column click for left pane.
+     * If clicking the same column, toggles order. Otherwise, switches to new column with its default order.
+     */
+    async function handleLeftSortChange(newColumn: SortColumn) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const listingId = leftPaneRef?.getListingId?.() as string | undefined
+        if (!listingId) return
+
+        let newOrder: SortOrder
+        if (newColumn === leftSortBy) {
+            // Toggle order
+            newOrder = leftSortOrder === 'ascending' ? 'descending' : 'ascending'
+        } else {
+            // New column - use remembered or default order
+            newOrder = await getColumnSortOrder(newColumn)
+        }
+
+        // Get current cursor filename to track position
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const cursorFilename = leftPaneRef?.getSelectedFilename?.() as string | undefined
+
+        // Re-sort the backend listing
+        const result = await resortListing(listingId, newColumn, newOrder, cursorFilename, showHiddenFiles)
+
+        // Update state
+        leftSortBy = newColumn
+        leftSortOrder = newOrder
+
+        // Persist
+        void saveAppStatus({ leftSortBy: newColumn })
+        void saveColumnSortOrder(newColumn, newOrder)
+
+        // Update cursor position after re-sort
+        if (result.newCursorIndex !== undefined) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            leftPaneRef?.setSelectedIndex?.(result.newCursorIndex)
+        }
+
+        // Refresh the view
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        leftPaneRef?.refreshView?.()
+    }
+
+    /**
+     * Handles sorting column click for right pane.
+     */
+    async function handleRightSortChange(newColumn: SortColumn) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const listingId = rightPaneRef?.getListingId?.() as string | undefined
+        if (!listingId) return
+
+        let newOrder: SortOrder
+        if (newColumn === rightSortBy) {
+            // Toggle order
+            newOrder = rightSortOrder === 'ascending' ? 'descending' : 'ascending'
+        } else {
+            // New column - use remembered or default order
+            newOrder = await getColumnSortOrder(newColumn)
+        }
+
+        // Get current cursor filename to track position
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const cursorFilename = rightPaneRef?.getSelectedFilename?.() as string | undefined
+
+        // Re-sort the backend listing
+        const result = await resortListing(listingId, newColumn, newOrder, cursorFilename, showHiddenFiles)
+
+        // Update state
+        rightSortBy = newColumn
+        rightSortOrder = newOrder
+
+        // Persist
+        void saveAppStatus({ rightSortBy: newColumn })
+        void saveColumnSortOrder(newColumn, newOrder)
+
+        // Update cursor position after re-sort
+        if (result.newCursorIndex !== undefined) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            rightPaneRef?.setSelectedIndex?.(result.newCursorIndex)
+        }
+
+        // Refresh the view
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        rightPaneRef?.refreshView?.()
     }
 
     async function handleLeftVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
@@ -243,6 +340,13 @@
         showHiddenFiles = settings.showHiddenFiles
         leftViewMode = status.leftViewMode
         rightViewMode = status.rightViewMode
+
+        // Load sort state
+        leftSortBy = status.leftSortBy
+        rightSortBy = status.rightSortBy
+        // Load remembered sort orders for each column
+        leftSortOrder = await getColumnSortOrder(leftSortBy)
+        rightSortOrder = await getColumnSortOrder(rightSortBy)
 
         // Determine the correct volume IDs by finding which volume contains each path
         // This is more reliable than trusting the stored volumeId, which may be stale
@@ -416,9 +520,12 @@
             isFocused={focusedPane === 'left'}
             {showHiddenFiles}
             viewMode={leftViewMode}
+            sortBy={leftSortBy}
+            sortOrder={leftSortOrder}
             onPathChange={handleLeftPathChange}
             onVolumeChange={handleLeftVolumeChange}
             onRequestFocus={handleLeftFocus}
+            onSortChange={handleLeftSortChange}
         />
         <FilePane
             bind:this={rightPaneRef}
@@ -428,9 +535,12 @@
             isFocused={focusedPane === 'right'}
             {showHiddenFiles}
             viewMode={rightViewMode}
+            sortBy={rightSortBy}
+            sortOrder={rightSortOrder}
             onPathChange={handleRightPathChange}
             onVolumeChange={handleRightVolumeChange}
             onRequestFocus={handleRightFocus}
+            onSortChange={handleRightSortChange}
         />
     {:else}
         <LoadingIcon />

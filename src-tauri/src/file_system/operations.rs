@@ -15,6 +15,31 @@ use uzers::{get_group_by_gid, get_user_by_uid};
 use super::watcher::{start_watching, stop_watching};
 use crate::benchmark;
 
+// ============================================================================
+// Sorting configuration
+// ============================================================================
+
+/// Column to sort files by.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SortColumn {
+    #[default]
+    Name,
+    Extension,
+    Size,
+    Modified,
+    Created,
+}
+
+/// Sort order (ascending or descending).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SortOrder {
+    #[default]
+    Ascending,
+    Descending,
+}
+
 /// Cache for uid→username and gid→groupname resolution.
 static OWNER_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
 static GROUP_CACHE: LazyLock<RwLock<HashMap<u32, String>>> = LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -36,6 +61,10 @@ struct CachedListing {
     path: std::path::PathBuf,
     /// Cached file entries
     entries: Vec<FileEntry>,
+    /// Current sort column
+    sort_by: SortColumn,
+    /// Current sort order
+    sort_order: SortOrder,
 }
 
 /// Cached directory listing for on-demand virtual scrolling.
@@ -47,6 +76,107 @@ pub(super) struct CachedListing {
     pub path: std::path::PathBuf,
     /// Cached file entries
     pub entries: Vec<FileEntry>,
+    /// Current sort column
+    pub sort_by: SortColumn,
+    /// Current sort order
+    pub sort_order: SortOrder,
+}
+
+// ============================================================================
+// Sorting implementation
+// ============================================================================
+
+/// Extracts file extension for sorting purposes.
+/// Returns: (is_dotfile, has_extension, extension_lowercase)
+/// Dotfiles (names starting with .) sort first, then files without extension, then by extension.
+fn extract_extension_for_sort(name: &str) -> (bool, bool, String) {
+    // Dotfiles (e.g., .gitignore) sort first
+    if name.starts_with('.') && !name[1..].contains('.') {
+        return (true, false, String::new());
+    }
+
+    // Check for extension
+    if let Some(dot_pos) = name.rfind('.') {
+        if dot_pos > 0 && dot_pos < name.len() - 1 {
+            let ext = name[dot_pos + 1..].to_lowercase();
+            return (false, true, ext);
+        }
+    }
+
+    // No extension
+    (false, false, String::new())
+}
+
+/// Sorts file entries by the specified column and order.
+/// Directories always come first, then files.
+/// Uses natural sorting for string comparisons (e.g., "img_2" before "img_10").
+pub fn sort_entries(entries: &mut [FileEntry], sort_by: SortColumn, sort_order: SortOrder) {
+    entries.sort_by(|a, b| {
+        // Directories always come first
+        match (a.is_directory, b.is_directory) {
+            (true, false) => return std::cmp::Ordering::Less,
+            (false, true) => return std::cmp::Ordering::Greater,
+            _ => {}
+        }
+
+        // Compare by the selected column
+        let primary = match sort_by {
+            SortColumn::Name => alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase()),
+            SortColumn::Extension => {
+                let (a_dotfile, a_has_ext, a_ext) = extract_extension_for_sort(&a.name);
+                let (b_dotfile, b_has_ext, b_ext) = extract_extension_for_sort(&b.name);
+
+                // Dotfiles first, then no extension, then by extension
+                match (a_dotfile, b_dotfile) {
+                    (true, false) => std::cmp::Ordering::Less,
+                    (false, true) => std::cmp::Ordering::Greater,
+                    (true, true) => alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase()),
+                    (false, false) => match (a_has_ext, b_has_ext) {
+                        (false, true) => std::cmp::Ordering::Less,
+                        (true, false) => std::cmp::Ordering::Greater,
+                        (false, false) => {
+                            alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase())
+                        }
+                        (true, true) => {
+                            let ext_cmp = alphanumeric_sort::compare_str(&a_ext, &b_ext);
+                            if ext_cmp == std::cmp::Ordering::Equal {
+                                alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase())
+                            } else {
+                                ext_cmp
+                            }
+                        }
+                    },
+                }
+            }
+            SortColumn::Size => {
+                // For directories, size is None - sort them by name among themselves
+                match (a.size, b.size) {
+                    (None, None) => alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase()),
+                    (None, Some(_)) => std::cmp::Ordering::Less,
+                    (Some(_), None) => std::cmp::Ordering::Greater,
+                    (Some(a_size), Some(b_size)) => a_size.cmp(&b_size),
+                }
+            }
+            SortColumn::Modified => match (a.modified_at, b.modified_at) {
+                (None, None) => alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase()),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (Some(a_time), Some(b_time)) => a_time.cmp(&b_time),
+            },
+            SortColumn::Created => match (a.created_at, b.created_at) {
+                (None, None) => alphanumeric_sort::compare_str(&a.name.to_lowercase(), &b.name.to_lowercase()),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (Some(a_time), Some(b_time)) => a_time.cmp(&b_time),
+            },
+        };
+
+        // Apply sort order
+        match sort_order {
+            SortOrder::Ascending => primary,
+            SortOrder::Descending => primary.reverse(),
+        }
+    });
 }
 
 /// Resolves a uid to a username, with caching.
@@ -258,12 +388,8 @@ pub fn list_directory(path: &Path) -> Result<Vec<FileEntry>, std::io::Error> {
     }
 
     let sort_start = std::time::Instant::now();
-    // Sort: directories first, then files, both alphabetically
-    entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
+    // Sort: directories first, then files, both alphabetically (using natural sort)
+    sort_entries(&mut entries, SortColumn::Name, SortOrder::Ascending);
     let sort_time = sort_start.elapsed();
 
     let total_time = overall_start.elapsed();
@@ -311,8 +437,8 @@ pub struct ListingStartResult {
 /// # Returns
 /// A `ListingStartResult` with listing ID and total count.
 pub fn list_directory_start(path: &Path, include_hidden: bool) -> Result<ListingStartResult, std::io::Error> {
-    // Use the default volume from VolumeManager
-    list_directory_start_with_volume("root", path, include_hidden)
+    // Use the default volume from VolumeManager with default sorting
+    list_directory_start_with_volume("root", path, include_hidden, SortColumn::Name, SortOrder::Ascending)
 }
 
 /// Starts a new directory listing using a specific volume.
@@ -323,6 +449,8 @@ pub fn list_directory_start(path: &Path, include_hidden: bool) -> Result<Listing
 /// * `volume_id` - The volume ID to use (e.g., "root", "dropbox")
 /// * `path` - The directory path to list (relative to volume root)
 /// * `include_hidden` - Whether to include hidden files in total count
+/// * `sort_by` - Column to sort by
+/// * `sort_order` - Ascending or descending
 ///
 /// # Returns
 /// A `ListingStartResult` with listing ID and total count.
@@ -330,6 +458,8 @@ pub fn list_directory_start_with_volume(
     volume_id: &str,
     path: &Path,
     include_hidden: bool,
+    sort_by: SortColumn,
+    sort_order: SortOrder,
 ) -> Result<ListingStartResult, std::io::Error> {
     // Reset benchmark epoch for this navigation
     benchmark::reset_epoch();
@@ -359,6 +489,10 @@ pub fn list_directory_start_with_volume(
         all_entries.iter().filter(|e| !e.name.starts_with('.')).count()
     };
 
+    // Sort the entries
+    let mut all_entries = all_entries;
+    sort_entries(&mut all_entries, sort_by, sort_order);
+
     // Cache the entries FIRST (watcher will read from here)
     if let Ok(mut cache) = LISTING_CACHE.write() {
         cache.insert(
@@ -367,6 +501,8 @@ pub fn list_directory_start_with_volume(
                 volume_id: volume_id.to_string(),
                 path: path.to_path_buf(),
                 entries: all_entries.clone(),
+                sort_by,
+                sort_order,
             },
         );
     }
@@ -517,6 +653,62 @@ pub fn list_directory_end(listing_id: &str) {
     }
 }
 
+/// Result of re-sorting a directory listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResortResult {
+    /// New index of the file that was at the cursor position before re-sorting.
+    /// None if the filename wasn't provided or wasn't found.
+    pub new_cursor_index: Option<usize>,
+}
+
+/// Re-sorts an existing cached listing in-place.
+///
+/// This is more efficient than creating a new listing when you just want to change the sort order.
+///
+/// # Arguments
+/// * `listing_id` - The listing ID from `list_directory_start`
+/// * `sort_by` - Column to sort by
+/// * `sort_order` - Ascending or descending
+/// * `cursor_filename` - Optional filename to track; returns its new index after sorting
+/// * `include_hidden` - Whether to include hidden files when calculating cursor index
+///
+/// # Returns
+/// A `ResortResult` with the new cursor index (if filename was provided and found).
+pub fn resort_listing(
+    listing_id: &str,
+    sort_by: SortColumn,
+    sort_order: SortOrder,
+    cursor_filename: Option<&str>,
+    include_hidden: bool,
+) -> Result<ResortResult, String> {
+    let mut cache = LISTING_CACHE.write().map_err(|_| "Failed to acquire cache lock")?;
+
+    let listing = cache
+        .get_mut(listing_id)
+        .ok_or_else(|| format!("Listing not found: {}", listing_id))?;
+
+    // Re-sort the entries
+    sort_entries(&mut listing.entries, sort_by, sort_order);
+    listing.sort_by = sort_by;
+    listing.sort_order = sort_order;
+
+    // Find the new cursor position
+    let new_cursor_index = cursor_filename.and_then(|name| {
+        if include_hidden {
+            listing.entries.iter().position(|e| e.name == name)
+        } else {
+            listing
+                .entries
+                .iter()
+                .filter(|e| !e.name.starts_with('.'))
+                .position(|e| e.name == name)
+        }
+    });
+
+    Ok(ResortResult { new_cursor_index })
+}
+
 // ============================================================================
 // Internal cache accessors for file watcher
 // ============================================================================
@@ -662,13 +854,9 @@ pub fn list_directory_core(path: &Path) -> Result<Vec<FileEntry>, std::io::Error
     }
     benchmark::log_event_value("stat_loop END, entries", entries.len());
 
-    // Sort: directories first, then files, both alphabetically
+    // Sort: directories first, then files, both alphabetically (using natural sort)
     benchmark::log_event("sort START");
-    entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
+    sort_entries(&mut entries, SortColumn::Name, SortOrder::Ascending);
     benchmark::log_event("sort END");
 
     let total_time = overall_start.elapsed();

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount, tick, untrack } from 'svelte'
-    import type { DirectoryDiff, FileEntry, SyncStatus } from './types'
+    import type { DirectoryDiff, FileEntry, SortColumn, SortOrder, SyncStatus } from './types'
     import {
         findFileIndex,
         getFileAt,
@@ -31,8 +31,11 @@
         isFocused?: boolean
         showHiddenFiles?: boolean
         viewMode?: ViewMode
+        sortBy?: SortColumn
+        sortOrder?: SortOrder
         onPathChange?: (path: string) => void
         onVolumeChange?: (volumeId: string, volumePath: string, targetPath: string) => void
+        onSortChange?: (column: SortColumn) => void
         onRequestFocus?: () => void
     }
 
@@ -43,8 +46,11 @@
         isFocused = false,
         showHiddenFiles = true,
         viewMode = 'brief',
+        sortBy = 'name',
+        sortOrder = 'ascending',
         onPathChange,
         onVolumeChange,
+        onSortChange,
         onRequestFocus,
     }: Props = $props()
 
@@ -82,6 +88,30 @@
     export function handleVolumeChooserKeyDown(e: KeyboardEvent): boolean {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
         return volumeBreadcrumbRef?.handleKeyDown(e) ?? false
+    }
+
+    // Get current listing ID for re-sorting
+    export function getListingId(): string {
+        return listingId
+    }
+
+    // Get selected filename for cursor tracking during re-sort
+    export function getSelectedFilename(): string | undefined {
+        return selectedEntry?.name
+    }
+
+    // Set selected index directly (for cursor tracking after re-sort)
+    export function setSelectedIndex(index: number): void {
+        selectedIndex = index
+        void fetchSelectedEntry()
+    }
+
+    // Cache generation counter - incremented to force list components to re-fetch
+    let cacheGeneration = $state(0)
+
+    // Force refresh the view by incrementing cache generation
+    export function refreshView(): void {
+        cacheGeneration++
     }
 
     // Navigate to parent directory, selecting the folder we came from
@@ -180,7 +210,7 @@
         try {
             // Start listing - returns just listingId and totalCount (no entries!)
             benchmark.logEvent('IPC listDirectoryStart CALL')
-            const result = await listDirectoryStart(path, includeHidden)
+            const result = await listDirectoryStart(path, includeHidden, sortBy, sortOrder)
             benchmark.logEventValue('IPC listDirectoryStart RETURNED, totalCount', result.totalCount)
 
             // Check if this load was cancelled
@@ -554,16 +584,24 @@
                 {listingId}
                 totalCount={effectiveTotalCount}
                 {includeHidden}
+                {cacheGeneration}
                 {selectedIndex}
                 {isFocused}
                 {syncStatusMap}
                 {hasParent}
                 {maxFilenameWidth}
+                {sortBy}
+                {sortOrder}
                 parentPath={hasParent ? currentPath.substring(0, currentPath.lastIndexOf('/')) || '/' : ''}
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
                 onContextMenu={handleContextMenu}
                 onSyncStatusRequest={fetchSyncStatusForPaths}
+                onSortChange={onSortChange
+                    ? (column: SortColumn) => {
+                          onSortChange(column)
+                      }
+                    : undefined}
             />
         {:else}
             <FullList
@@ -571,15 +609,23 @@
                 {listingId}
                 totalCount={effectiveTotalCount}
                 {includeHidden}
+                {cacheGeneration}
                 {selectedIndex}
                 {isFocused}
                 {syncStatusMap}
                 {hasParent}
+                {sortBy}
+                {sortOrder}
                 parentPath={hasParent ? currentPath.substring(0, currentPath.lastIndexOf('/')) || '/' : ''}
                 onSelect={handleSelect}
                 onNavigate={handleNavigate}
                 onContextMenu={handleContextMenu}
                 onSyncStatusRequest={fetchSyncStatusForPaths}
+                onSortChange={onSortChange
+                    ? (column: SortColumn) => {
+                          onSortChange(column)
+                      }
+                    : undefined}
             />
         {/if}
     </div>

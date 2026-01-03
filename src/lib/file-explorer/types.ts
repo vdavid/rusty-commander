@@ -78,3 +78,31 @@ export interface VolumeInfo {
     /** Whether this can be ejected */
     isEjectable: boolean
 }
+
+// ============================================================================
+// Sorting types
+// ============================================================================
+
+/** Column to sort files by. Must match Rust enum. */
+export type SortColumn = 'name' | 'extension' | 'size' | 'modified' | 'created'
+
+/** Sort order. Must match Rust enum. */
+export type SortOrder = 'ascending' | 'descending'
+
+/** Default sort order for each column (first click uses this). */
+export const defaultSortOrders: Record<SortColumn, SortOrder> = {
+    name: 'ascending',
+    extension: 'ascending',
+    size: 'descending',
+    modified: 'descending',
+    created: 'descending',
+}
+
+/** Default sort column when opening a new directory. */
+export const DEFAULT_SORT_BY: SortColumn = 'name'
+
+/** Result of re-sorting a listing. */
+export interface ResortResult {
+    /** New index of the cursor file after re-sorting, if found. */
+    newCursorIndex?: number
+}

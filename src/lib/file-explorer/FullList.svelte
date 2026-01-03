@@ -1,9 +1,10 @@
 <script lang="ts">
-    import type { FileEntry, SyncStatus } from './types'
+    import type { FileEntry, SortColumn, SortOrder, SyncStatus } from './types'
     import { getCachedIcon, iconCacheVersion, prefetchIcons } from '$lib/icon-cache'
     import { calculateVirtualWindow, getScrollToPosition } from './virtual-scroll'
     import { getFileRange } from '$lib/tauri-commands'
     import { startDragTracking } from '$lib/drag-drop'
+    import SortableHeader from './SortableHeader.svelte'
 
     /** Prefetch buffer - load this many items around visible range */
     const PREFETCH_BUFFER = 200
@@ -12,30 +13,38 @@
         listingId: string
         totalCount: number
         includeHidden: boolean
+        cacheGeneration?: number
         selectedIndex: number
         isFocused?: boolean
         syncStatusMap?: Record<string, SyncStatus>
         hasParent: boolean
         parentPath: string
+        sortBy: SortColumn
+        sortOrder: SortOrder
         onSelect: (index: number) => void
         onNavigate: (entry: FileEntry) => void
         onContextMenu?: (entry: FileEntry) => void
         onSyncStatusRequest?: (paths: string[]) => void
+        onSortChange?: (column: SortColumn) => void
     }
 
     const {
         listingId,
         totalCount,
         includeHidden,
+        cacheGeneration = 0,
         selectedIndex,
         isFocused = true,
         syncStatusMap = {},
         hasParent,
         parentPath,
+        sortBy,
+        sortOrder,
         onSelect,
         onNavigate,
         onContextMenu,
         onSyncStatusRequest,
+        onSortChange,
     }: Props = $props()
 
     // ==== Cached entries (prefetch buffer) ====
@@ -286,28 +295,33 @@
     let prevListingId = ''
     let prevIncludeHidden = false
     let prevTotalCount = 0
+    let prevCacheGeneration = 0
 
-    // Single effect: fetch when ready, reset cache only when listingId/includeHidden/totalCount actually changes
+    // Single effect: fetch when ready, reset cache when listingId/includeHidden/totalCount/cacheGeneration changes
     $effect(() => {
         // Read reactive dependencies
         const currentListingId = listingId
         const currentIncludeHidden = includeHidden
         const currentTotalCount = totalCount
+        const currentCacheGeneration = cacheGeneration
         if (!currentListingId || containerHeight <= 0) return
 
-        // Check if listingId, includeHidden, or totalCount actually changed
+        // Check if any tracked prop changed
         // totalCount changes when files are added/removed by the file watcher
+        // cacheGeneration changes when sorting is changed (forces re-fetch)
         if (
             currentListingId !== prevListingId ||
             currentIncludeHidden !== prevIncludeHidden ||
-            currentTotalCount !== prevTotalCount
+            currentTotalCount !== prevTotalCount ||
+            currentCacheGeneration !== prevCacheGeneration
         ) {
-            // Reset cache for new listing, filter change, or file count change
+            // Reset cache for new listing, filter change, file count change, or cache invalidation
             cachedEntries = []
             cachedRange = { start: 0, end: 0 }
             prevListingId = currentListingId
             prevIncludeHidden = currentIncludeHidden
             prevTotalCount = currentTotalCount
+            prevCacheGeneration = currentCacheGeneration
         }
 
         void fetchVisibleRange()
@@ -329,6 +343,32 @@
     role="listbox"
     aria-activedescendant={selectedIndex >= 0 ? `file-${String(selectedIndex)}` : undefined}
 >
+    <!-- Header row with sortable columns -->
+    <div class="header-row">
+        <span class="header-icon"></span>
+        <SortableHeader
+            column="name"
+            label="Name"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={onSortChange ?? (() => {})}
+        />
+        <SortableHeader
+            column="size"
+            label="Size"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={onSortChange ?? (() => {})}
+            align="right"
+        />
+        <SortableHeader
+            column="modified"
+            label="Modified"
+            currentSortColumn={sortBy}
+            currentSortOrder={sortOrder}
+            onClick={onSortChange ?? (() => {})}
+        />
+    </div>
     <!-- Spacer div provides accurate scrollbar for full list size -->
     <div class="virtual-spacer" style="height: {virtualWindow.totalSize}px;">
         <!-- Visible window positioned with translateY -->
@@ -400,6 +440,23 @@
         line-height: 1;
         flex: 1;
         outline: none;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .header-row {
+        display: grid;
+        grid-template-columns: 16px 1fr 85px 120px;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-xxs) var(--spacing-sm);
+        background: var(--color-bg-header);
+        border-bottom: 1px solid var(--color-border);
+        height: 22px;
+        flex-shrink: 0;
+    }
+
+    .header-icon {
+        width: 16px;
     }
 
     .virtual-spacer {

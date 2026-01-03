@@ -81,6 +81,8 @@ describe('BriefList component', () => {
                     selectedIndex: 0,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -110,6 +112,8 @@ describe('BriefList component', () => {
                     selectedIndex: 0,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -118,8 +122,8 @@ describe('BriefList component', () => {
 
             await tick()
 
-            const list = target.querySelector('.brief-list')
-            expect(list?.classList.contains('is-focused')).toBe(true)
+            const container = target.querySelector('.brief-list-container')
+            expect(container?.classList.contains('is-focused')).toBe(true)
         })
 
         it('does NOT apply is-focused class when isFocused is false', async () => {
@@ -132,6 +136,8 @@ describe('BriefList component', () => {
                     selectedIndex: 0,
                     isFocused: false,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -140,8 +146,8 @@ describe('BriefList component', () => {
 
             await tick()
 
-            const list = target.querySelector('.brief-list')
-            expect(list?.classList.contains('is-focused')).toBe(false)
+            const container = target.querySelector('.brief-list-container')
+            expect(container?.classList.contains('is-focused')).toBe(false)
         })
     })
 
@@ -156,6 +162,8 @@ describe('BriefList component', () => {
                     selectedIndex: 2,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -177,6 +185,8 @@ describe('BriefList component', () => {
                     selectedIndex: 2,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -201,6 +211,8 @@ describe('BriefList component', () => {
                     selectedIndex: 5,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -225,6 +237,8 @@ describe('BriefList component', () => {
                     selectedIndex: 0,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -251,6 +265,8 @@ describe('BriefList component', () => {
                     selectedIndex: 0,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -275,6 +291,8 @@ describe('BriefList component', () => {
                     selectedIndex: 0,
                     isFocused: true,
                     hasParent: false,
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     parentPath: '/',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
@@ -319,6 +337,8 @@ describe('FullList component', () => {
                     isFocused: true,
                     hasParent: false,
                     parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
                 },
@@ -340,6 +360,8 @@ describe('FullList component', () => {
                     isFocused: true,
                     hasParent: false,
                     parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
                 },
@@ -364,6 +386,8 @@ describe('FullList component', () => {
                     isFocused: true,
                     hasParent: false,
                     parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
                 },
@@ -385,6 +409,8 @@ describe('FullList component', () => {
                     isFocused: true,
                     hasParent: false,
                     parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
                     onSelect: vi.fn(),
                     onNavigate: vi.fn(),
                 },
@@ -393,6 +419,94 @@ describe('FullList component', () => {
             await tick()
 
             expect(typeof (component as unknown as Record<string, unknown>).scrollToIndex).toBe('function')
+        })
+    })
+
+    describe('Sorting headers', () => {
+        it('renders sortable column headers', async () => {
+            mount(FullList, {
+                target,
+                props: {
+                    listingId: 'test-full-headers',
+                    totalCount: mockEntries.length,
+                    includeHidden: true,
+                    selectedIndex: 0,
+                    isFocused: true,
+                    hasParent: false,
+                    parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
+                    onSelect: vi.fn(),
+                    onNavigate: vi.fn(),
+                },
+            })
+
+            await tick()
+
+            // Should have header row with sortable headers
+            const headers = target.querySelectorAll('.header-row button')
+            expect(headers.length).toBe(3) // Name, Size, Modified
+        })
+
+        it('calls onSortChange when header is clicked', async () => {
+            const onSortChange = vi.fn()
+            mount(FullList, {
+                target,
+                props: {
+                    listingId: 'test-full-sort-click',
+                    totalCount: mockEntries.length,
+                    includeHidden: true,
+                    selectedIndex: 0,
+                    isFocused: true,
+                    hasParent: false,
+                    parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
+                    onSelect: vi.fn(),
+                    onNavigate: vi.fn(),
+                    onSortChange,
+                },
+            })
+
+            await tick()
+
+            // Click the Size header (find by text content instead of aria-label)
+            const headers = target.querySelectorAll('.header-row button.sortable-header')
+            // Size is the second header (Name, Size, Modified)
+            const sizeHeader = headers[1]
+            expect(sizeHeader).toBeTruthy()
+
+            sizeHeader.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+            await tick()
+
+            expect(onSortChange).toHaveBeenCalledWith('size')
+        })
+
+        it('shows sort indicator on current column', async () => {
+            mount(FullList, {
+                target,
+                props: {
+                    listingId: 'test-full-sort-indicator',
+                    totalCount: mockEntries.length,
+                    includeHidden: true,
+                    selectedIndex: 0,
+                    isFocused: true,
+                    hasParent: false,
+                    parentPath: '/',
+                    sortBy: 'name',
+                    sortOrder: 'ascending',
+                    onSelect: vi.fn(),
+                    onNavigate: vi.fn(),
+                },
+            })
+
+            await tick()
+
+            // The name header should have the is-active class and ascending indicator
+            const nameHeader = target.querySelector('.header-row .sortable-header.is-active')
+            expect(nameHeader).toBeTruthy()
+            expect(nameHeader?.textContent).toContain('Name')
+            expect(nameHeader?.textContent).toContain('▲')
         })
     })
 })

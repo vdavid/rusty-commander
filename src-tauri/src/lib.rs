@@ -143,6 +143,7 @@ pub fn run() {
             commands::file_system::get_file_at,
             commands::file_system::get_total_count,
             commands::file_system::find_file_index,
+            commands::file_system::resort_listing,
             commands::file_system::path_exists,
             commands::file_system::benchmark_log,
             commands::font_metrics::store_font_metrics,
