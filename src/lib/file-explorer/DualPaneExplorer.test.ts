@@ -49,6 +49,13 @@ vi.mock('$lib/tauri-commands', () => ({
         .mockResolvedValue([
             { id: 'root', name: 'Macintosh HD', path: '/', category: 'main_volume', isEjectable: false },
         ]),
+    findContainingVolume: vi.fn().mockResolvedValue({
+        id: 'root',
+        name: 'Macintosh HD',
+        path: '/',
+        category: 'main_volume',
+        isEjectable: false,
+    }),
     getDefaultVolumeId: vi.fn().mockResolvedValue('root'),
     DEFAULT_VOLUME_ID: 'root',
 }))

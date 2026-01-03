@@ -146,6 +146,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             commands::volumes::get_default_volume_id,
             #[cfg(target_os = "macos")]
+            commands::volumes::find_containing_volume,
+            #[cfg(target_os = "macos")]
             permissions::check_full_disk_access,
             #[cfg(target_os = "macos")]
             permissions::open_privacy_settings

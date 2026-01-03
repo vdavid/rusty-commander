@@ -1,14 +1,15 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte'
-    import { listVolumes, listen, type UnlistenFn } from '$lib/tauri-commands'
+    import { listVolumes, findContainingVolume, listen, type UnlistenFn } from '$lib/tauri-commands'
     import type { VolumeInfo, LocationCategory } from './types'
 
     interface Props {
         volumeId: string
-        onVolumeChange?: (volumeId: string, volumePath: string) => void
+        currentPath: string
+        onVolumeChange?: (volumeId: string, volumePath: string, targetPath: string) => void
     }
 
-    const { volumeId, onVolumeChange }: Props = $props()
+    const { volumeId, currentPath, onVolumeChange }: Props = $props()
 
     let volumes = $state<VolumeInfo[]>([])
     let isOpen = $state(false)
@@ -16,8 +17,12 @@
     let unlistenMount: UnlistenFn | undefined
     let unlistenUnmount: UnlistenFn | undefined
 
-    // Current volume info derived from volumes list
-    const currentVolume = $derived(volumes.find((v) => v.id === volumeId))
+    // The ID of the actual volume that contains the current path
+    // This is used to show the checkmark on the correct volume, not on favorites
+    let containingVolumeId = $state<string | null>(null)
+
+    // Current volume info derived from volumes list (the actual containing volume)
+    const currentVolume = $derived(volumes.find((v) => v.id === containingVolumeId))
     const currentVolumeName = $derived(currentVolume?.name ?? 'Volume')
     const currentVolumeIcon = $derived(getIconForVolume(currentVolume))
 
@@ -71,10 +76,28 @@
         volumes = await listVolumes()
     }
 
-    function handleVolumeSelect(volume: VolumeInfo) {
+    async function updateContainingVolume(path: string) {
+        const containing = await findContainingVolume(path)
+        containingVolumeId = containing?.id ?? volumeId
+    }
+
+    async function handleVolumeSelect(volume: VolumeInfo) {
         isOpen = false
-        if (volume.id !== volumeId) {
-            onVolumeChange?.(volume.id, volume.path)
+
+        // Check if this is a favorite (shortcut) or an actual volume
+        if (volume.category === 'favorite') {
+            // For favorites, find the actual containing volume
+            const containingVolume = await findContainingVolume(volume.path)
+            if (containingVolume) {
+                // Navigate to the favorite's path, but set the volume to the containing volume
+                onVolumeChange?.(containingVolume.id, containingVolume.path, volume.path)
+            } else {
+                // Fallback: use root volume
+                onVolumeChange?.('root', '/', volume.path)
+            }
+        } else {
+            // For actual volumes, navigate to the volume's root
+            onVolumeChange?.(volume.id, volume.path, volume.path)
         }
     }
 
@@ -99,8 +122,14 @@
         }
     }
 
+    // Update containing volume when current path changes
+    $effect(() => {
+        void updateContainingVolume(currentPath)
+    })
+
     onMount(async () => {
         await loadVolumes()
+        await updateContainingVolume(currentPath)
 
         // Listen for volume mount/unmount events
         unlistenMount = await listen<{ volumeId: string }>('volume-mounted', () => {
@@ -122,6 +151,16 @@
         document.removeEventListener('click', handleClickOutside)
         document.removeEventListener('keydown', handleKeyDown)
     })
+
+    // Helper: check if a volume should show the checkmark
+    // For favorites, never show checkmark
+    // For actual volumes, show if it's the containing volume for the current path
+    function shouldShowCheckmark(volume: VolumeInfo): boolean {
+        if (volume.category === 'favorite') {
+            return false
+        }
+        return volume.id === containingVolumeId
+    }
 </script>
 
 <div class="volume-breadcrumb" bind:this={dropdownRef}>
@@ -149,12 +188,12 @@
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                         class="volume-item"
-                        class:is-selected={volume.id === volumeId}
+                        class:is-selected={shouldShowCheckmark(volume)}
                         onclick={() => {
-                            handleVolumeSelect(volume)
+                            void handleVolumeSelect(volume)
                         }}
                     >
-                        {#if volume.id === volumeId}
+                        {#if shouldShowCheckmark(volume)}
                             <span class="checkmark">✓</span>
                         {:else}
                             <span class="checkmark-placeholder"></span>

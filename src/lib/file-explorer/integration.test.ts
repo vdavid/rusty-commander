@@ -70,6 +70,13 @@ vi.mock('$lib/tauri-commands', () => ({
         },
         { id: 'dropbox', name: 'Dropbox', path: '/Users/test/Dropbox', category: 'cloud_drive', isEjectable: false },
     ] as VolumeInfo[]),
+    findContainingVolume: vi.fn().mockResolvedValue({
+        id: 'root',
+        name: 'Macintosh HD',
+        path: '/',
+        category: 'main_volume',
+        isEjectable: false,
+    } as VolumeInfo),
     getDefaultVolumeId: vi.fn().mockResolvedValue('root'),
     DEFAULT_VOLUME_ID: 'root',
 }))
@@ -321,6 +328,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -334,6 +342,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -350,6 +359,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -363,6 +373,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -386,6 +397,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -409,6 +421,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                     onVolumeChange: volumeChangeFn,
                 },
             })
@@ -437,6 +450,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -465,6 +479,7 @@ describe('VolumeBreadcrumb', () => {
                 target,
                 props: {
                     volumeId: 'root',
+                    currentPath: '/',
                 },
             })
 
@@ -632,5 +647,18 @@ describe('hasParent derived logic', () => {
 
     it('hasParent is true when in subfolder of external drive', () => {
         expect(calculateHasParent('/Volumes/External/subfolder', '/Volumes/External')).toBe(true)
+    })
+
+    // Favorites are shortcuts, so when navigating to a favorite like ~/Documents,
+    // volumePath is the containing volume's root ('/'), not the favorite's path
+    it('hasParent is true when at favorite location (favorites are shortcuts)', () => {
+        // When user selects "Documents" favorite, we set:
+        // - volumeId/volumePath to the containing volume (root: '/')
+        // - currentPath to the favorite ('/Users/test/Documents')
+        expect(calculateHasParent('/Users/test/Documents', '/')).toBe(true)
+    })
+
+    it('hasParent is true when inside a favorite folder', () => {
+        expect(calculateHasParent('/Users/test/Documents/subfolder', '/')).toBe(true)
     })
 })

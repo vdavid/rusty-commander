@@ -212,6 +212,21 @@ export async function getDefaultVolumeId(): Promise<string> {
     }
 }
 
+/**
+ * Finds the actual volume (not a favorite) that contains a given path.
+ * This is used to determine which volume to highlight when a favorite is selected.
+ * @param path - Path to find the containing volume for
+ * @returns The VolumeInfo for the containing volume, or null if not found
+ */
+export async function findContainingVolume(path: string): Promise<VolumeInfo | null> {
+    try {
+        return await invoke<VolumeInfo | null>('find_containing_volume', { path })
+    } catch {
+        // Command not available (non-macOS) - return null
+        return null
+    }
+}
+
 // ============================================================================
 // Permission checking (macOS only)
 // ============================================================================

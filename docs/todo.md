@@ -1,7 +1,23 @@
 ## Listing
 
-- [ ] We need to ask for permissions for `Downloads`, etc. Handle permission denial gracefully!
+- [x] Allow user to go up from favorites. In the volume selector, we currently put a tick next to the selected volume,
+      but for favorites, they should never have the checkmark. When selected, the volume containing them should be
+      ticked. And the "root" folder of the favorite should not actually be a root folder, but should contain ".." and
+      act in every way like the volume that contains it. Basically, favorites should just be shortcuts, not volumes.
+- [ ] Save to state the last used directory per volume. Save it to the same state store where we save showHiddenFiles
+      and the such. Use it when switching volumes. (Favorites are not volumes, they are just shortcuts to directories,
+      so their state belongs to the volume that contains them.)
+- [ ] Add Back/Forward feature. I want to add a Back/Forward feature to let the user navigate back and forth between
+      their folder history. Add a "Go" menu after "View", and it should contain "Back" and "Forward", with shortcuts
+      `⌘[` and `⌘]`, respectively. Then also add "Parent folder" with the shortcut `⌘↑` (already implemented). If a
+      folder doesn't exist anymore, go up its parent tree until you find a folder that does exist. If even the parent
+      tree doesn't exist anymore (e.g., the volume is unmounted), go to the next item in the history. If the history is
+      empty, stay in the current folder (noop). Same for going forward. For the folders that were skipped during going
+      back/forward, don't remove them from the history. The history should be reset when quitting the app.
+- [ ] Make the volume selector work with the keyboard
+- [ ] Create ESLint rules or sg so that font sizes are always rem, but margins and paddings are always px.
 - [ ] Add different sorting options
+    - UI: I want to display a header in Full and Brief mode.
 - [ ] When sorting alphabetically, sort numbers ascending, not alphabetically
 - [ ] Make it handle network drives
 - [ ] Test with slow drives like network drives
@@ -11,11 +27,14 @@
 - [ ] Read the "dataless" flag for Dropbox/Drive files to avoid triggering a massive download when iterating through the
       files later, to generate thumbnails or whatnot. Files are only placeholders in this case: they have a file size in
       `stat`, but zero bytes on disk.
+- [ ] Make the path bar more elaborate with dropdown selectors
 
 ## Cleanup
 
 - A round of refactoring is due
-- Better test coverage to avoid regressions!
+- If user changes system font, do we need to recalc the font width mapping? How do we get notified?
+- Mark macOS vs generic code clearer, and add this to the guide. Is there a way to run some coherence checks for
+  `#[cfg(target_os = "macos")]` == true/false separately?
 
 ## Settings
 
@@ -57,3 +76,8 @@ Ideas
 - [ ] "Explain this" in context menu: Right-click a minified JS file, a binary, or a cryptic config -> "Explain what
       this does."
 - [ ] Add a small local LLM for privacy-conscious users.
+
+## Why not Nimble Commander?
+
+- No Dropbox sync icons
+- Silently fails when trying to access a network drive

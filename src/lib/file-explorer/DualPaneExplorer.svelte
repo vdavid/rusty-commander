@@ -51,16 +51,16 @@
         containerElement?.focus()
     }
 
-    function handleLeftVolumeChange(volumeId: string, volumePath: string) {
+    function handleLeftVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
         leftVolumeId = volumeId
-        leftPath = volumePath
-        void saveAppStatus({ leftVolumeId: volumeId, leftPath: volumePath })
+        leftPath = targetPath
+        void saveAppStatus({ leftVolumeId: volumeId, leftPath: targetPath })
     }
 
-    function handleRightVolumeChange(volumeId: string, volumePath: string) {
+    function handleRightVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
         rightVolumeId = volumeId
-        rightPath = volumePath
-        void saveAppStatus({ rightVolumeId: volumeId, rightPath: volumePath })
+        rightPath = targetPath
+        void saveAppStatus({ rightVolumeId: volumeId, rightPath: targetPath })
     }
 
     function handleLeftFocus() {

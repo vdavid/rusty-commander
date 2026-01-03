@@ -32,7 +32,7 @@
         showHiddenFiles?: boolean
         viewMode?: ViewMode
         onPathChange?: (path: string) => void
-        onVolumeChange?: (volumeId: string, volumePath: string) => void
+        onVolumeChange?: (volumeId: string, volumePath: string, targetPath: string) => void
         onRequestFocus?: () => void
     }
 
@@ -500,8 +500,13 @@
         <VolumeBreadcrumb
             bind:this={volumeBreadcrumbRef}
             {volumeId}
-            onVolumeChange={(newVolumeId: string, newVolumePath: string) => {
-                onVolumeChange?.(newVolumeId, newVolumePath)
+            {currentPath}
+            onVolumeChange={(newVolumeId: string, newVolumePath: string, targetPath: string) => {
+                // Navigate to the target path (may differ from volume root for favorites)
+                currentPath = targetPath
+                onPathChange?.(targetPath)
+                onVolumeChange?.(newVolumeId, newVolumePath, targetPath)
+                void loadDirectory(targetPath)
             }}
         />
         <span class="path"
