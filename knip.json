@@ -1,13 +1,7 @@
 {
     "$schema": "https://unpkg.com/knip@5/schema.json",
     "ignore": ["src/lib/icon-cache.ts", "src/routes/+layout.ts", "src/lib/benchmark.ts"],
-    "ignoreDependencies": [
-        "@tauri-apps/cli",
-        "@tauri-apps/plugin-window-state",
-        "@testing-library/svelte",
-        "@sveltejs/adapter-static",
-        "tailwindcss"
-    ],
+    "ignoreDependencies": ["@tauri-apps/cli", "@testing-library/svelte", "@sveltejs/adapter-static"],
     "ignoreExportsUsedInFile": true,
     "project": ["src/**/*.{ts,svelte}"],
     "svelte": {
