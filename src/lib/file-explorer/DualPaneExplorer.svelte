@@ -72,7 +72,10 @@
 
         leftVolumeId = volumeId
         leftPath = pathToNavigate
-        void saveAppStatus({ leftVolumeId: volumeId, leftPath: pathToNavigate })
+
+        // Focus the left pane after successful volume selection
+        focusedPane = 'left'
+        void saveAppStatus({ leftVolumeId: volumeId, leftPath: pathToNavigate, focusedPane: 'left' })
     }
 
     async function handleRightVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
@@ -87,7 +90,10 @@
 
         rightVolumeId = volumeId
         rightPath = pathToNavigate
-        void saveAppStatus({ rightVolumeId: volumeId, rightPath: pathToNavigate })
+
+        // Focus the right pane after successful volume selection
+        focusedPane = 'right'
+        void saveAppStatus({ rightVolumeId: volumeId, rightPath: pathToNavigate, focusedPane: 'right' })
     }
 
     interface OtherPaneState {
@@ -145,6 +151,27 @@
             void saveAppStatus({ focusedPane: 'right' })
         }
     }
+    // Helper: Route key event to any open volume chooser
+    // Returns true if the event was handled by a volume chooser
+    function routeToVolumeChooser(e: KeyboardEvent): boolean {
+        // Check if EITHER pane has a volume chooser open - if so, route events there
+        // This is important because F1/F2 can open a volume chooser on the non-focused pane
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        if (leftPaneRef?.isVolumeChooserOpen?.()) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            if (leftPaneRef.handleVolumeChooserKeyDown?.(e)) {
+                return true
+            }
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        if (rightPaneRef?.isVolumeChooserOpen?.()) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            if (rightPaneRef.handleVolumeChooserKeyDown?.(e)) {
+                return true
+            }
+        }
+        return false
+    }
 
     function handleKeyDown(e: KeyboardEvent) {
         if (e.key === 'Tab') {
@@ -171,8 +198,13 @@
             return
         }
 
+        // Route to volume chooser if one is open
+        if (routeToVolumeChooser(e)) {
+            return
+        }
+
         // Forward arrow keys and Enter to the focused pane
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript thinks FilePane.handleKeyDown is unused without this
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- TypeScript thinks FilePane methods are unused without this
         const activePaneRef = (focusedPane === 'left' ? leftPaneRef : rightPaneRef) as FilePane | undefined
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         activePaneRef?.handleKeyDown(e)

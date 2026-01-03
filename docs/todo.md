@@ -1,8 +1,8 @@
 ## Listing
 
-- [x] Save to state the last used directory per volume. Save it to the same state store where we save showHiddenFiles
-      and the such. Use it when switching volumes. (Favorites are not volumes, they are just shortcuts to directories,
-      so their state belongs to the volume that contains them.)
+- [x] Please help me make the volume selector work with the keyboard. When I press the shortcut or click on the volume
+      selector, the currently active volume should have the cursor, and arrow up/down should move the cursor up/down
+      among the volumes. Enter should select them, Esc should close the volume selector.
 - [ ] Add Back/Forward feature. I want to add a Back/Forward feature to let the user navigate back and forth between
       their folder history. Add a "Go" menu after "View", and it should contain "Back" and "Forward", with shortcuts
       `⌘[` and `⌘]`, respectively. Then also add "Parent folder" with the shortcut `⌘↑` (already implemented). If a
@@ -10,7 +10,6 @@
       tree doesn't exist anymore (e.g., the volume is unmounted), go to the next item in the history. If the history is
       empty, stay in the current folder (noop). Same for going forward. For the folders that were skipped during going
       back/forward, don't remove them from the history. The history should be reset when quitting the app.
-- [ ] Make the volume selector work with the keyboard
 - [ ] Create ESLint rules or sg so that font sizes are always rem, but margins and paddings are always px.
 - [ ] Add different sorting options
     - UI: I want to display a header in Full and Brief mode.

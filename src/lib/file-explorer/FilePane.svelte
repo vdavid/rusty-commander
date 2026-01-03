@@ -72,6 +72,18 @@
         volumeBreadcrumbRef?.toggle()
     }
 
+    // Check if volume chooser is open (for event routing)
+    export function isVolumeChooserOpen(): boolean {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        return volumeBreadcrumbRef?.getIsOpen() ?? false
+    }
+
+    // Forward keyboard events to volume chooser when open
+    export function handleVolumeChooserKeyDown(e: KeyboardEvent): boolean {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        return volumeBreadcrumbRef?.handleKeyDown(e) ?? false
+    }
+
     // Track the current load operation to cancel outdated ones
     let loadGeneration = 0
     // Track last sequence for file watcher diffs

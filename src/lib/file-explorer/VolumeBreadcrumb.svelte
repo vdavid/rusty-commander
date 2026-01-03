@@ -13,6 +13,7 @@
 
     let volumes = $state<VolumeInfo[]>([])
     let isOpen = $state(false)
+    let highlightedIndex = $state(-1)
     let dropdownRef: HTMLDivElement | undefined = $state()
     let unlistenMount: UnlistenFn | undefined
     let unlistenUnmount: UnlistenFn | undefined
@@ -28,6 +29,19 @@
 
     // Group volumes by category for display
     const groupedVolumes = $derived(groupByCategory(volumes))
+
+    // Flat list of all volumes for keyboard navigation
+    const allVolumes = $derived(groupedVolumes.flatMap((g) => g.items))
+
+    // When dropdown opens, initialize highlight to current volume
+    $effect(() => {
+        if (isOpen) {
+            const currentIdx = allVolumes.findIndex((v) => shouldShowCheckmark(v))
+            highlightedIndex = currentIdx >= 0 ? currentIdx : 0
+        } else {
+            highlightedIndex = -1
+        }
+    })
 
     // Get appropriate icon for a volume (use cloud icon for cloud drives)
     function getIconForVolume(volume: VolumeInfo | undefined): string | undefined {
@@ -110,14 +124,64 @@
         isOpen = !isOpen
     }
 
+    // Export to check if dropdown is open
+    export function getIsOpen(): boolean {
+        return isOpen
+    }
+
+    // Export keyboard handler for parent components to call
+    export function handleKeyDown(e: KeyboardEvent): boolean {
+        if (!isOpen) return false
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                highlightedIndex = Math.min(highlightedIndex + 1, allVolumes.length - 1)
+                return true
+            case 'ArrowUp':
+                e.preventDefault()
+                highlightedIndex = Math.max(highlightedIndex - 1, 0)
+                return true
+            case 'Enter':
+                e.preventDefault()
+                if (highlightedIndex >= 0 && highlightedIndex < allVolumes.length) {
+                    void handleVolumeSelect(allVolumes[highlightedIndex])
+                }
+                return true
+            case 'Escape':
+                e.preventDefault()
+                isOpen = false
+                return true
+            case 'Home':
+                e.preventDefault()
+                highlightedIndex = 0
+                return true
+            case 'End':
+                e.preventDefault()
+                highlightedIndex = allVolumes.length - 1
+                return true
+            default:
+                return false
+        }
+    }
+
+    // Handle mouse hover to sync with keyboard navigation
+    function handleVolumeHover(volume: VolumeInfo) {
+        const idx = allVolumes.indexOf(volume)
+        if (idx >= 0) {
+            highlightedIndex = idx
+        }
+    }
+
     function handleClickOutside(event: MouseEvent) {
         if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
             isOpen = false
         }
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
-        if (event.key === 'Escape') {
+    // Document-level keyboard handler for Escape when dropdown is open
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+        if (event.key === 'Escape' && isOpen) {
             isOpen = false
         }
     }
@@ -142,14 +206,14 @@
 
         // Close on click outside
         document.addEventListener('click', handleClickOutside)
-        document.addEventListener('keydown', handleKeyDown)
+        document.addEventListener('keydown', handleDocumentKeyDown)
     })
 
     onDestroy(() => {
         unlistenMount?.()
         unlistenUnmount?.()
         document.removeEventListener('click', handleClickOutside)
-        document.removeEventListener('keydown', handleKeyDown)
+        document.removeEventListener('keydown', handleDocumentKeyDown)
     })
 
     // Helper: check if a volume should show the checkmark
@@ -186,11 +250,16 @@
                 {#each group.items as volume (volume.id)}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <!-- svelte-ignore a11y_mouse_events_have_key_events -->
                     <div
                         class="volume-item"
                         class:is-selected={shouldShowCheckmark(volume)}
+                        class:is-highlighted={allVolumes.indexOf(volume) === highlightedIndex}
                         onclick={() => {
                             void handleVolumeSelect(volume)
+                        }}
+                        onmouseover={() => {
+                            handleVolumeHover(volume)
                         }}
                     >
                         {#if shouldShowCheckmark(volume)}
@@ -298,7 +367,8 @@
         transition: background-color 0.1s ease;
     }
 
-    .volume-item:hover {
+    .volume-item:hover,
+    .volume-item.is-highlighted {
         background-color: var(--color-selection-bg);
     }
 

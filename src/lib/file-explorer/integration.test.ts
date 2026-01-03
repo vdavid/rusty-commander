@@ -155,6 +155,88 @@ describe('FilePane keyboard handling', () => {
 
             expect(typeof (component as unknown as Record<string, unknown>).toggleVolumeChooser).toBe('function')
         })
+
+        it('exports isVolumeChooserOpen method', async () => {
+            const component = mount(FilePane, {
+                target,
+                props: {
+                    initialPath: '/test',
+                    volumeId: 'root',
+                    volumePath: '/',
+                    isFocused: true,
+                    showHiddenFiles: true,
+                    viewMode: 'brief',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            expect(typeof (component as unknown as Record<string, unknown>).isVolumeChooserOpen).toBe('function')
+        })
+
+        it('exports handleVolumeChooserKeyDown method', async () => {
+            const component = mount(FilePane, {
+                target,
+                props: {
+                    initialPath: '/test',
+                    volumeId: 'root',
+                    volumePath: '/',
+                    isFocused: true,
+                    showHiddenFiles: true,
+                    viewMode: 'brief',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            expect(typeof (component as unknown as Record<string, unknown>).handleVolumeChooserKeyDown).toBe('function')
+        })
+
+        it('isVolumeChooserOpen returns false initially', async () => {
+            const component = mount(FilePane, {
+                target,
+                props: {
+                    initialPath: '/test',
+                    volumeId: 'root',
+                    volumePath: '/',
+                    isFocused: true,
+                    showHiddenFiles: true,
+                    viewMode: 'brief',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            const isVolumeChooserOpen = (component as unknown as { isVolumeChooserOpen: () => boolean })
+                .isVolumeChooserOpen
+            expect(isVolumeChooserOpen()).toBe(false)
+        })
+
+        it('isVolumeChooserOpen returns true after toggle', async () => {
+            const component = mount(FilePane, {
+                target,
+                props: {
+                    initialPath: '/test',
+                    volumeId: 'root',
+                    volumePath: '/',
+                    isFocused: true,
+                    showHiddenFiles: true,
+                    viewMode: 'brief',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            const toggleVolumeChooser = (component as unknown as { toggleVolumeChooser: () => void })
+                .toggleVolumeChooser
+            toggleVolumeChooser()
+
+            await tick()
+
+            const isVolumeChooserOpen = (component as unknown as { isVolumeChooserOpen: () => boolean })
+                .isVolumeChooserOpen
+            expect(isVolumeChooserOpen()).toBe(true)
+        })
     })
 
     describe('Enter key', () => {
@@ -497,6 +579,342 @@ describe('VolumeBreadcrumb', () => {
             expect(categoryLabels.length).toBeGreaterThanOrEqual(0)
         })
     })
+
+    describe('Keyboard navigation', () => {
+        it('exports handleKeyDown method', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            expect(typeof (component as unknown as Record<string, unknown>).handleKeyDown).toBe('function')
+        })
+
+        it('exports getIsOpen method', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            expect(typeof (component as unknown as Record<string, unknown>).getIsOpen).toBe('function')
+        })
+
+        it('getIsOpen returns false when dropdown is closed', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            const getIsOpen = (component as unknown as { getIsOpen: () => boolean }).getIsOpen
+            expect(getIsOpen()).toBe(false)
+        })
+
+        it('getIsOpen returns true when dropdown is open', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            const getIsOpen = (component as unknown as { getIsOpen: () => boolean }).getIsOpen
+            expect(getIsOpen()).toBe(true)
+        })
+
+        it('handleKeyDown returns false when dropdown is closed', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })
+            expect(handleKeyDown(event)).toBe(false)
+        })
+
+        it('ArrowDown moves highlight down', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            // Verify dropdown is open and first item is highlighted
+            const items = target.querySelectorAll('.volume-item')
+            expect(items.length).toBeGreaterThan(1)
+            expect(items[0].classList.contains('is-highlighted')).toBe(true)
+
+            // Press ArrowDown
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })
+            const handled = handleKeyDown(event)
+
+            await tick()
+
+            expect(handled).toBe(true)
+            expect(items[0].classList.contains('is-highlighted')).toBe(false)
+            expect(items[1].classList.contains('is-highlighted')).toBe(true)
+        })
+
+        it('ArrowUp moves highlight up', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown and move down first
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+
+            // Move down once
+            handleKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+            await tick()
+
+            // Now move back up
+            const event = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
+            const handled = handleKeyDown(event)
+
+            await tick()
+
+            expect(handled).toBe(true)
+            const items = target.querySelectorAll('.volume-item')
+            expect(items[0].classList.contains('is-highlighted')).toBe(true)
+        })
+
+        it('ArrowUp at first item stays at first', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            // Try to move up when already at first
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            const event = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })
+            handleKeyDown(event)
+
+            await tick()
+
+            const items = target.querySelectorAll('.volume-item')
+            expect(items[0].classList.contains('is-highlighted')).toBe(true)
+        })
+
+        it('Enter selects highlighted volume and closes dropdown', async () => {
+            const volumeChangeFn = vi.fn()
+
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                    onVolumeChange: volumeChangeFn,
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            // Move to second item (first non-selected volume)
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            handleKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+            await tick()
+
+            // Press Enter
+            const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+            const handled = handleKeyDown(enterEvent)
+
+            await tick()
+
+            expect(handled).toBe(true)
+            expect(volumeChangeFn).toHaveBeenCalled()
+        })
+
+        it('Escape closes dropdown via handleKeyDown', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            expect(target.querySelector('.volume-dropdown')).toBeTruthy()
+
+            // Press Escape via handleKeyDown
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+            const handled = handleKeyDown(event)
+
+            await tick()
+
+            expect(handled).toBe(true)
+            expect(target.querySelector('.volume-dropdown')).toBeNull()
+        })
+
+        it('Home jumps to first item', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+
+            // Move down a couple times
+            handleKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+            handleKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+            await tick()
+
+            // Press Home
+            const handled = handleKeyDown(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+            await tick()
+
+            expect(handled).toBe(true)
+            const items = target.querySelectorAll('.volume-item')
+            expect(items[0].classList.contains('is-highlighted')).toBe(true)
+        })
+
+        it('End jumps to last item', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            // Press End
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            const handled = handleKeyDown(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+            await tick()
+
+            expect(handled).toBe(true)
+            const items = target.querySelectorAll('.volume-item')
+            const lastItem = items[items.length - 1]
+            expect(lastItem.classList.contains('is-highlighted')).toBe(true)
+        })
+
+        it('unhandled keys return false', async () => {
+            const component = mount(VolumeBreadcrumb, {
+                target,
+                props: {
+                    volumeId: 'root',
+                    currentPath: '/',
+                },
+            })
+
+            await waitForUpdates(100)
+
+            // Open dropdown
+            const toggle = (component as unknown as { toggle: () => void }).toggle
+            toggle()
+
+            await tick()
+
+            const handleKeyDown = (component as unknown as { handleKeyDown: (e: KeyboardEvent) => boolean })
+                .handleKeyDown
+            const event = new KeyboardEvent('keydown', { key: 'x', bubbles: true })
+            const handled = handleKeyDown(event)
+
+            expect(handled).toBe(false)
+        })
+    })
 })
 
 // ============================================================================
@@ -589,6 +1007,113 @@ describe('Volume chooser keyboard shortcuts (logic)', () => {
 
         handleF2()
         expect(rightVolumeChooserOpened).toBe(true)
+    })
+})
+
+// ============================================================================
+// Volume chooser event isolation tests (logic only)
+// ============================================================================
+
+describe('Volume chooser event isolation (logic)', () => {
+    // Shared helper that simulates DualPaneExplorer.handleKeyDown routing logic
+    // Returns: { volumeChooserHandled, fileListHandled }
+    function simulateKeyRouting(
+        key: string,
+        volumeChooserOpen: boolean,
+    ): { volumeChooserHandled: boolean; fileListHandled: boolean } {
+        let volumeChooserHandled = false
+        let fileListHandled = false
+
+        // This simulates the DualPaneExplorer handleKeyDown logic
+        if (volumeChooserOpen) {
+            // Simulates: activePaneRef.handleVolumeChooserKeyDown(e)
+            if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Home', 'End'].includes(key)) {
+                volumeChooserHandled = true
+                return { volumeChooserHandled, fileListHandled }
+            }
+        }
+        // Simulates: activePaneRef.handleKeyDown(e)
+        if (['ArrowDown', 'ArrowUp', 'Enter'].includes(key)) {
+            fileListHandled = true
+        }
+
+        return { volumeChooserHandled, fileListHandled }
+    }
+
+    it('arrow keys go to volume chooser when open, not file list', () => {
+        const result = simulateKeyRouting('ArrowDown', true)
+        expect(result.volumeChooserHandled).toBe(true)
+        expect(result.fileListHandled).toBe(false)
+    })
+
+    it('arrow keys go to file list when volume chooser is closed', () => {
+        const result = simulateKeyRouting('ArrowDown', false)
+        expect(result.volumeChooserHandled).toBe(false)
+        expect(result.fileListHandled).toBe(true)
+    })
+
+    it('Enter selects volume when volume chooser is open', () => {
+        const result = simulateKeyRouting('Enter', true)
+        expect(result.volumeChooserHandled).toBe(true)
+        expect(result.fileListHandled).toBe(false)
+    })
+
+    it('Enter navigates file list when volume chooser is closed', () => {
+        const result = simulateKeyRouting('Enter', false)
+        expect(result.volumeChooserHandled).toBe(false)
+        expect(result.fileListHandled).toBe(true)
+    })
+
+    it('Escape goes to volume chooser when open', () => {
+        const result = simulateKeyRouting('Escape', true)
+        expect(result.volumeChooserHandled).toBe(true)
+        expect(result.fileListHandled).toBe(false)
+    })
+
+    it('Home/End go to volume chooser when open', () => {
+        expect(simulateKeyRouting('Home', true).volumeChooserHandled).toBe(true)
+        expect(simulateKeyRouting('End', true).volumeChooserHandled).toBe(true)
+    })
+
+    // Test for cross-pane scenario: F1 opens left pane volume chooser, but right pane is focused
+    it('keys go to non-focused pane volume chooser when open (cross-pane)', () => {
+        // Simulates: left pane volume chooser is open, right pane is focused
+        function simulateCrossPaneRouting(
+            key: string,
+            leftVolumeChooserOpen: boolean,
+            rightVolumeChooserOpen: boolean,
+        ): { leftHandled: boolean; rightHandled: boolean; fileListHandled: boolean } {
+            let leftHandled = false
+            let rightHandled = false
+            let fileListHandled = false
+
+            // Check BOTH panes for open volume chooser (the fix!)
+            if (leftVolumeChooserOpen) {
+                if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Home', 'End'].includes(key)) {
+                    leftHandled = true
+                    return { leftHandled, rightHandled, fileListHandled }
+                }
+            }
+            if (rightVolumeChooserOpen) {
+                if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Home', 'End'].includes(key)) {
+                    rightHandled = true
+                    return { leftHandled, rightHandled, fileListHandled }
+                }
+            }
+
+            // If neither volume chooser handled it, go to file list
+            if (['ArrowDown', 'ArrowUp', 'Enter'].includes(key)) {
+                fileListHandled = true
+            }
+
+            return { leftHandled, rightHandled, fileListHandled }
+        }
+
+        // F1 opened left volume chooser, but right pane is focused
+        const result = simulateCrossPaneRouting('ArrowDown', true, false)
+        expect(result.leftHandled).toBe(true)
+        expect(result.rightHandled).toBe(false)
+        expect(result.fileListHandled).toBe(false)
     })
 })
 
