@@ -84,6 +84,21 @@
         return volumeBreadcrumbRef?.handleKeyDown(e) ?? false
     }
 
+    // Navigate to parent directory, selecting the folder we came from
+    export async function navigateToParent(): Promise<boolean> {
+        if (currentPath === '/' || currentPath === volumePath) {
+            return false // Already at root
+        }
+        const currentFolderName = currentPath.split('/').pop()
+        const lastSlash = currentPath.lastIndexOf('/')
+        const parentPath = lastSlash > 0 ? currentPath.substring(0, lastSlash) : '/'
+
+        currentPath = parentPath
+        onPathChange?.(parentPath)
+        await loadDirectory(parentPath, currentFolderName)
+        return true
+    }
+
     // Track the current load operation to cancel outdated ones
     let loadGeneration = 0
     // Track last sequence for file watcher diffs
@@ -359,10 +374,7 @@
         // Handle Backspace or ⌘↑ - go to parent directory
         if ((e.key === 'Backspace' || (e.key === 'ArrowUp' && e.metaKey)) && hasParent) {
             e.preventDefault()
-            const parentEntry = createParentEntry(currentPath)
-            if (parentEntry) {
-                void handleNavigate(parentEntry)
-            }
+            void navigateToParent()
             return
         }
 

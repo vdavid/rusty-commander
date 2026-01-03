@@ -17,6 +17,11 @@ pub const COPY_FILENAME_ID: &str = "copy_filename";
 pub const GET_INFO_ID: &str = "get_info";
 pub const QUICK_LOOK_ID: &str = "quick_look";
 
+/// Menu item IDs for navigation (Go menu).
+pub const GO_BACK_ID: &str = "go_back";
+pub const GO_FORWARD_ID: &str = "go_forward";
+pub const GO_PARENT_ID: &str = "go_parent";
+
 /// Context for the current menu selection.
 #[derive(Clone, Default)]
 pub struct MenuContext {
@@ -156,6 +161,41 @@ pub fn build_menu<R: Runtime>(
             ],
         )?;
         menu.append(&view_menu)?;
+    }
+
+    // Create Go menu for navigation
+    let go_back_item = tauri::menu::MenuItem::with_id(app, GO_BACK_ID, "Back", true, Some("Cmd+["))?;
+    let go_forward_item = tauri::menu::MenuItem::with_id(app, GO_FORWARD_ID, "Forward", true, Some("Cmd+]"))?;
+    let go_parent_item = tauri::menu::MenuItem::with_id(app, GO_PARENT_ID, "Parent folder", true, Some("Cmd+Up"))?;
+
+    let go_menu = Submenu::with_items(
+        app,
+        "Go",
+        true,
+        &[
+            &go_back_item,
+            &go_forward_item,
+            &tauri::menu::PredefinedMenuItem::separator(app)?,
+            &go_parent_item,
+        ],
+    )?;
+
+    // Insert Go menu after View (before Window)
+    // Find Window menu position and insert before it
+    let mut inserted = false;
+    let items = menu.items()?;
+    for (i, item) in items.iter().enumerate() {
+        if let tauri::menu::MenuItemKind::Submenu(submenu) = item
+            && submenu.text()? == "Window"
+        {
+            menu.insert(&go_menu, i)?;
+            inserted = true;
+            break;
+        }
+    }
+    if !inserted {
+        // Fallback: append at the end
+        menu.append(&go_menu)?;
     }
 
     Ok(MenuItems {

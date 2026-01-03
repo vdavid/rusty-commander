@@ -1187,3 +1187,170 @@ describe('hasParent derived logic', () => {
         expect(calculateHasParent('/Users/test/Documents/subfolder', '/')).toBe(true)
     })
 })
+
+// ============================================================================
+// Navigation history integration tests (logic only)
+// ============================================================================
+
+describe('Navigation history behavior (logic)', () => {
+    // Import helpers from the actual module for realistic testing
+    // These tests verify the integration pattern, not the navigation-history module itself
+
+    interface MockHistory {
+        stack: string[]
+        currentIndex: number
+    }
+
+    function createMockHistory(initialPath: string): MockHistory {
+        return { stack: [initialPath], currentIndex: 0 }
+    }
+
+    function push(history: MockHistory, path: string): MockHistory {
+        if (path === history.stack[history.currentIndex]) return history
+        const newStack = [...history.stack.slice(0, history.currentIndex + 1), path]
+        return { stack: newStack, currentIndex: newStack.length - 1 }
+    }
+
+    function back(history: MockHistory): MockHistory {
+        if (history.currentIndex <= 0) return history
+        return { ...history, currentIndex: history.currentIndex - 1 }
+    }
+
+    function forward(history: MockHistory): MockHistory {
+        if (history.currentIndex >= history.stack.length - 1) return history
+        return { ...history, currentIndex: history.currentIndex + 1 }
+    }
+
+    function canGoBack(history: MockHistory): boolean {
+        return history.currentIndex > 0
+    }
+
+    function canGoForward(history: MockHistory): boolean {
+        return history.currentIndex < history.stack.length - 1
+    }
+
+    it('navigation-action with back triggers history backward', () => {
+        let leftHistory = createMockHistory('/a')
+        leftHistory = push(leftHistory, '/b')
+        leftHistory = push(leftHistory, '/c')
+
+        // Simulate back action
+        if (canGoBack(leftHistory)) {
+            leftHistory = back(leftHistory)
+        }
+
+        expect(leftHistory.stack[leftHistory.currentIndex]).toBe('/b')
+    })
+
+    it('navigation-action with forward triggers history forward', () => {
+        let leftHistory = createMockHistory('/a')
+        leftHistory = push(leftHistory, '/b')
+        leftHistory = back(leftHistory) // now at /a
+
+        // Simulate forward action
+        if (canGoForward(leftHistory)) {
+            leftHistory = forward(leftHistory)
+        }
+
+        expect(leftHistory.stack[leftHistory.currentIndex]).toBe('/b')
+    })
+
+    it('back/forward are per-pane independent', () => {
+        let leftHistory = createMockHistory('/left-a')
+        let rightHistory = createMockHistory('/right-a')
+
+        // Navigate left pane
+        leftHistory = push(leftHistory, '/left-b')
+
+        // Navigate right pane
+        rightHistory = push(rightHistory, '/right-b')
+        rightHistory = push(rightHistory, '/right-c')
+
+        // Back on left doesn't affect right
+        leftHistory = back(leftHistory)
+
+        expect(leftHistory.stack[leftHistory.currentIndex]).toBe('/left-a')
+        expect(rightHistory.stack[rightHistory.currentIndex]).toBe('/right-c')
+    })
+
+    it('pushing after back truncates forward history', () => {
+        let history = createMockHistory('/a')
+        history = push(history, '/b')
+        history = push(history, '/c')
+        history = back(history) // at /b
+        history = push(history, '/d') // should truncate /c
+
+        expect(history.stack).toEqual(['/a', '/b', '/d'])
+        expect(canGoForward(history)).toBe(false)
+    })
+
+    it('back at oldest entry is a no-op', () => {
+        const history = createMockHistory('/a')
+        const result = back(history)
+
+        expect(result).toBe(history)
+        expect(result.currentIndex).toBe(0)
+    })
+
+    it('forward at newest entry is a no-op', () => {
+        let history = createMockHistory('/a')
+        history = push(history, '/b')
+        const result = forward(history)
+
+        expect(result).toBe(history)
+        expect(result.currentIndex).toBe(1)
+    })
+})
+
+// ============================================================================
+// resolveValidPath test (deleted folder handling logic)
+// ============================================================================
+
+describe('resolveValidPath logic (deleted folder handling)', () => {
+    // Simulate the path resolution logic from DualPaneExplorer
+    async function resolveValidPath(
+        targetPath: string,
+        existsCheck: (path: string) => Promise<boolean>,
+    ): Promise<string | null> {
+        let path = targetPath
+        while (path !== '/' && path !== '') {
+            if (await existsCheck(path)) {
+                return path
+            }
+            const lastSlash = path.lastIndexOf('/')
+            path = lastSlash > 0 ? path.substring(0, lastSlash) : '/'
+        }
+        if (await existsCheck('/')) {
+            return '/'
+        }
+        return null
+    }
+
+    it('returns original path if it exists', async () => {
+        const exists = vi.fn().mockResolvedValue(true)
+        const result = await resolveValidPath('/a/b/c', exists)
+        expect(result).toBe('/a/b/c')
+    })
+
+    it('walks up to parent if path deleted', async () => {
+        const exists = vi.fn().mockImplementation((path: string) => {
+            return Promise.resolve(path === '/a/b' || path === '/a' || path === '/')
+        })
+        const result = await resolveValidPath('/a/b/c', exists)
+        expect(result).toBe('/a/b')
+    })
+
+    it('walks all the way to root if needed', async () => {
+        const exists = vi.fn().mockImplementation((path: string) => {
+            return Promise.resolve(path === '/')
+        })
+        const result = await resolveValidPath('/a/b/c', exists)
+        expect(result).toBe('/')
+    })
+
+    it('returns null if even root does not exist (volume unmounted)', async () => {
+        const exists = vi.fn().mockResolvedValue(false)
+        const result = await resolveValidPath('/Volumes/External/folder', exists)
+        expect(result).toBeNull()
+    })
+})

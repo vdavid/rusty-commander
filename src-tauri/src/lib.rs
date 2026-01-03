@@ -25,7 +25,10 @@ mod settings;
 #[cfg(target_os = "macos")]
 mod volumes;
 
-use menu::{MenuState, SHOW_HIDDEN_FILES_ID, VIEW_MODE_BRIEF_ID, VIEW_MODE_FULL_ID, ViewMode};
+use menu::{
+    GO_BACK_ID, GO_FORWARD_ID, GO_PARENT_ID, MenuState, SHOW_HIDDEN_FILES_ID, VIEW_MODE_BRIEF_ID, VIEW_MODE_FULL_ID,
+    ViewMode,
+};
 use tauri::{Emitter, Manager};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -117,6 +120,15 @@ pub fn run() {
                     let mode = if is_full { "full" } else { "brief" };
                     let _ = app.emit("view-mode-changed", serde_json::json!({ "mode": mode }));
                 }
+            } else if id == GO_BACK_ID || id == GO_FORWARD_ID || id == GO_PARENT_ID {
+                // Handle Go menu navigation actions
+                let action = match id {
+                    GO_BACK_ID => "back",
+                    GO_FORWARD_ID => "forward",
+                    GO_PARENT_ID => "parent",
+                    _ => return,
+                };
+                let _ = app.emit("navigation-action", serde_json::json!({ "action": action }));
             } else {
                 // Handle file actions
                 commands::ui::execute_menu_action(app, id);

@@ -1,15 +1,5 @@
 ## Listing
 
-- [x] Please help me make the volume selector work with the keyboard. When I press the shortcut or click on the volume
-      selector, the currently active volume should have the cursor, and arrow up/down should move the cursor up/down
-      among the volumes. Enter should select them, Esc should close the volume selector.
-- [ ] Add Back/Forward feature. I want to add a Back/Forward feature to let the user navigate back and forth between
-      their folder history. Add a "Go" menu after "View", and it should contain "Back" and "Forward", with shortcuts
-      `⌘[` and `⌘]`, respectively. Then also add "Parent folder" with the shortcut `⌘↑` (already implemented). If a
-      folder doesn't exist anymore, go up its parent tree until you find a folder that does exist. If even the parent
-      tree doesn't exist anymore (e.g., the volume is unmounted), go to the next item in the history. If the history is
-      empty, stay in the current folder (noop). Same for going forward. For the folders that were skipped during going
-      back/forward, don't remove them from the history. The history should be reset when quitting the app.
 - [ ] Create ESLint rules or sg so that font sizes are always rem, but margins and paddings are always px.
 - [ ] Add different sorting options
     - UI: I want to display a header in Full and Brief mode.
@@ -23,11 +13,11 @@
       files later, to generate thumbnails or whatnot. Files are only placeholders in this case: they have a file size in
       `stat`, but zero bytes on disk.
 - [ ] Make the path bar more elaborate with dropdown selectors
+- [ ] Add tabs
 
 ## Cleanup
 
 - A round of refactoring is due
-- If user changes system font, do we need to recalc the font width mapping? How do we get notified?
 - Mark macOS vs generic code clearer, and add this to the guide. Is there a way to run some coherence checks for
   `#[cfg(target_os = "macos")]` == true/false separately?
 

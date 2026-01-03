@@ -21,6 +21,16 @@
     } from '$lib/tauri-commands'
     import type { VolumeInfo } from './types'
     import { ensureFontMetricsLoaded } from '$lib/font-metrics'
+    import {
+        createHistory,
+        push,
+        back,
+        forward,
+        getCurrentPath,
+        canGoBack,
+        canGoForward,
+        type NavigationHistory,
+    } from './navigation-history'
 
     let leftPath = $state('~')
     let rightPath = $state('~')
@@ -39,6 +49,11 @@
     let unlistenSettings: UnlistenFn | undefined
     let unlistenViewMode: UnlistenFn | undefined
     let unlistenVolumeUnmount: UnlistenFn | undefined
+    let unlistenNavigation: UnlistenFn | undefined
+
+    // Navigation history for each pane (per-pane, session-only)
+    let leftHistory = $state<NavigationHistory>(createHistory('~'))
+    let rightHistory = $state<NavigationHistory>(createHistory('~'))
 
     // Derived volume paths
     const leftVolumePath = $derived(volumes.find((v) => v.id === leftVolumeId)?.path ?? '/')
@@ -46,6 +61,7 @@
 
     function handleLeftPathChange(path: string) {
         leftPath = path
+        leftHistory = push(leftHistory, path)
         void saveAppStatus({ leftPath: path })
         void saveLastUsedPathForVolume(leftVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
@@ -54,6 +70,7 @@
 
     function handleRightPathChange(path: string) {
         rightPath = path
+        rightHistory = push(rightHistory, path)
         void saveAppStatus({ rightPath: path })
         void saveLastUsedPathForVolume(rightVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
@@ -237,6 +254,10 @@
         leftVolumeId = leftContaining?.id ?? defaultId
         rightVolumeId = rightContaining?.id ?? defaultId
 
+        // Initialize history with loaded paths
+        leftHistory = createHistory(status.leftPath)
+        rightHistory = createHistory(status.rightPath)
+
         initialized = true
 
         // Subscribe to settings changes from the backend menu
@@ -265,6 +286,11 @@
         unlistenVolumeUnmount = await listen<{ volumeId: string }>('volume-unmounted', (event) => {
             void handleVolumeUnmount(event.payload.volumeId)
         })
+
+        // Subscribe to navigation actions from Go menu
+        unlistenNavigation = await listen<{ action: string }>('navigation-action', (event) => {
+            void handleNavigationAction(event.payload.action)
+        })
     })
 
     async function handleVolumeUnmount(unmountedId: string) {
@@ -288,10 +314,80 @@
         volumes = await listVolumes()
     }
 
+    /**
+     * Resolves a path to a valid existing path by walking up the parent tree.
+     * Returns null if even the root doesn't exist (volume unmounted).
+     */
+    async function resolveValidPath(targetPath: string): Promise<string | null> {
+        let path = targetPath
+        while (path !== '/' && path !== '') {
+            if (await pathExists(path)) {
+                return path
+            }
+            // Go to parent
+            const lastSlash = path.lastIndexOf('/')
+            path = lastSlash > 0 ? path.substring(0, lastSlash) : '/'
+        }
+        // Check root
+        if (await pathExists('/')) {
+            return '/'
+        }
+        return null
+    }
+
+    /**
+     * Updates pane state after navigating back/forward (doesn't push to history).
+     */
+    function updatePaneAfterHistoryNavigation(isLeft: boolean, newHistory: NavigationHistory, targetPath: string) {
+        if (isLeft) {
+            leftHistory = newHistory
+            leftPath = targetPath
+            void saveAppStatus({ leftPath: targetPath })
+            void saveLastUsedPathForVolume(leftVolumeId, targetPath)
+        } else {
+            rightHistory = newHistory
+            rightPath = targetPath
+            void saveAppStatus({ rightPath: targetPath })
+            void saveLastUsedPathForVolume(rightVolumeId, targetPath)
+        }
+        containerElement?.focus()
+    }
+
+    /**
+     * Handles navigation actions from the Go menu (back/forward/parent).
+     */
+    async function handleNavigationAction(action: string) {
+        const isLeft = focusedPane === 'left'
+        const paneRef = isLeft ? leftPaneRef : rightPaneRef
+
+        if (action === 'parent') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            await paneRef?.navigateToParent()
+            return
+        }
+
+        const history = isLeft ? leftHistory : rightHistory
+        let newHistory: NavigationHistory
+
+        if (action === 'back' && canGoBack(history)) {
+            newHistory = back(history)
+        } else if (action === 'forward' && canGoForward(history)) {
+            newHistory = forward(history)
+        } else {
+            return
+        }
+
+        const targetPath = await resolveValidPath(getCurrentPath(newHistory))
+        if (targetPath !== null) {
+            updatePaneAfterHistoryNavigation(isLeft, newHistory, targetPath)
+        }
+    }
+
     onDestroy(() => {
         unlistenSettings?.()
         unlistenViewMode?.()
         unlistenVolumeUnmount?.()
+        unlistenNavigation?.()
     })
 
     // Focus the container after initialization so keyboard events work
