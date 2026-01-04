@@ -60,6 +60,33 @@ func (c *ESLintCheck) Run(ctx *CheckContext) error {
 	return nil
 }
 
+// StylelintCheck validates CSS and catches undefined custom properties.
+type StylelintCheck struct{}
+
+func (c *StylelintCheck) Name() string {
+	return "stylelint"
+}
+
+func (c *StylelintCheck) Run(ctx *CheckContext) error {
+	var cmd *exec.Cmd
+	if ctx.CI {
+		cmd = exec.Command("pnpm", "stylelint")
+	} else {
+		cmd = exec.Command("pnpm", "stylelint:fix")
+	}
+	cmd.Dir = ctx.RootDir
+	output, err := runCommand(cmd, true)
+	if err != nil {
+		fmt.Println()
+		fmt.Print(indentOutput(output, "      "))
+		if ctx.CI {
+			return fmt.Errorf("CSS lint errors found, run pnpm stylelint:fix locally")
+		}
+		return fmt.Errorf("stylelint found unfixable errors")
+	}
+	return nil
+}
+
 // SvelteCheck runs svelte-check for type and a11y validation.
 type SvelteCheck struct{}
 

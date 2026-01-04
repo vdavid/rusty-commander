@@ -64,7 +64,10 @@ Can use also `./scripts/check.sh --rust`, `./scripts/check.sh --svelte`, `./scri
 or `./scripts/check.sh --help` to see all options.
 
 Can also use `cargo fmt`, `cargo clippy`, `cargo audit`, `cargo deny check`, `cargo nextest run`, `pnpm format`,
-`pnpm lint --fix`, `pnpm test`, `pnpm test:e2e` as needed.
+`pnpm lint --fix`, `pnpm stylelint:fix`, `pnpm test`, `pnpm test:e2e` as needed.
+
+**CSS health checks**: When writing CSS, ALWAYS use variables defined in `src/app.css`. Stylelint catches
+undefined/hallucinated CSS variables.
 
 GitHub Actions workflow in `.github/workflows/ci.yml`:
 

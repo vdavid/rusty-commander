@@ -17,9 +17,12 @@
     /* === Backgrounds === */
     --color-bg-primary: #ffffff;
     --color-bg-secondary: #f5f5f5;
+    --color-bg-tertiary: #e8e8e8;
+    --color-bg-header: #f0f0f0;
 
     /* === Borders === */
     --color-border-primary: #ccc;
+    --color-border: #ddd;
 
     /* === Text === */
     --color-text-primary: #000000;
@@ -28,8 +31,10 @@
 
     /* === Interactive States === */
     --color-hover-bg: rgba(0, 120, 215, 0.1);
+    --color-bg-hover: rgba(0, 120, 215, 0.08);
     --color-selection-bg: #cce4f7;
     --color-focus-border: #0078d4;
+    --color-accent: #0078d4;
 
     /* === Semantic Colors === */
     --color-allow: #2e7d32;
@@ -61,9 +66,12 @@
         /* === Backgrounds === */
         --color-bg-primary: #1e1e1e;
         --color-bg-secondary: #2a2a2a;
+        --color-bg-tertiary: #333333;
+        --color-bg-header: #252525;
 
         /* === Borders === */
         --color-border-primary: #444444;
+        --color-border: #555555;
 
         /* === Text === */
         --color-text-primary: #ffffff;
@@ -72,8 +80,10 @@
 
         /* === Interactive States === */
         --color-hover-bg: rgba(100, 180, 255, 0.15);
+        --color-bg-hover: rgba(100, 180, 255, 0.12);
         --color-selection-bg: #0a50d0;
         --color-focus-border: #4da3ff;
+        --color-accent: #4da3ff;
 
         /* === Semantic Colors === */
         --color-error: #f44336;
