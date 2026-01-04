@@ -32,7 +32,7 @@
         justify-content: center;
         height: 100%;
         padding: 24px;
-        line-height: 1.5rem;
+        line-height: 24px;
     }
 
     .content {

@@ -71,7 +71,7 @@ Only add JSDoc that actually adds info.
 
 ### CSS
 
-- Use `rem` for typography, `px` for everything else.
+- `html { font-size: 16px; }` is set so `1rem = 16px`. Use `px` by default but can use `rem` if it's more descriptive.
 - Use variables for colors, spacing, and the such, in `app.css`.
 - Always think about accessibility when designing, and dark+light modes.
 

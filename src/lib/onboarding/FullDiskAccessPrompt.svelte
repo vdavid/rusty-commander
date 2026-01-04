@@ -75,7 +75,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        line-height: 1.5rem;
+        line-height: 24px;
         /*background: var(--color-bg-primary);*/
         /*font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;*/
         color: var(--color-text-primary);
@@ -89,7 +89,7 @@
     h1 {
         font-size: 24px;
         font-weight: 600;
-        margin: 0 0 1.5rem 0;
+        margin: 0 0 24px 0;
         color: var(--color-text-primary);
     }
 
@@ -114,7 +114,7 @@
         display: flex;
         gap: 24px;
         justify-content: center;
-        margin: 1.5rem 0;
+        margin: 24px 0;
     }
 
     button {
