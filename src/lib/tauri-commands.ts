@@ -4,11 +4,14 @@ import { invoke } from '@tauri-apps/api/core'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event'
 import type {
+    AuthMode,
     DiscoveryState,
     FileEntry,
     ListingStartResult,
     NetworkHost,
     ResortResult,
+    ShareListError,
+    ShareListResult,
     SortColumn,
     SortOrder,
     SyncStatus,
@@ -339,6 +342,59 @@ export async function resolveNetworkHost(hostId: string): Promise<NetworkHost | 
     } catch {
         // Command not available (non-macOS) - return null
         return null
+    }
+}
+
+// ============================================================================
+// SMB share listing (macOS only)
+// ============================================================================
+
+/**
+ * Lists shares available on a network host.
+ * Returns cached results if available (30 second TTL), otherwise queries the host.
+ * Attempts guest access first; returns an error if authentication is required.
+ * @param hostId Unique identifier for the host (used for caching)
+ * @param hostname Hostname to connect to (for example, "NASPOLYA.local")
+ * @param ipAddress Optional resolved IP address (preferred over hostname for reliability)
+ * @returns Result with shares and auth mode, or error
+ */
+export async function listSharesOnHost(
+    hostId: string,
+    hostname: string,
+    ipAddress?: string,
+): Promise<ShareListResult> {
+    // The Rust command returns Result<ShareListResult, ShareListError>
+    // Tauri auto-converts Ok to value and Err to thrown error
+    return invoke<ShareListResult>('list_shares_on_host', { hostId, hostname, ipAddress })
+}
+
+/**
+ * Prefetches shares for a host (for example, on hover).
+ * Same as listSharesOnHost but designed for prefetching - errors are silently ignored.
+ * Returns immediately if shares are already cached.
+ * @param hostId Unique identifier for the host
+ * @param hostname Hostname to connect to
+ * @param ipAddress Optional resolved IP address
+ */
+export async function prefetchShares(hostId: string, hostname: string, ipAddress?: string): Promise<void> {
+    try {
+        await invoke('prefetch_shares', { hostId, hostname, ipAddress })
+    } catch {
+        // Silently ignore prefetch errors
+    }
+}
+
+/**
+ * Gets the cached authentication mode for a host.
+ * Returns 'unknown' if no cached data is available.
+ * @param hostId The host ID to check
+ * @returns Cached AuthMode or 'unknown'
+ */
+export async function getHostAuthMode(hostId: string): Promise<AuthMode> {
+    try {
+        return await invoke<AuthMode>('get_host_auth_mode', { hostId })
+    } catch {
+        return 'unknown'
     }
 }
 

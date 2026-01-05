@@ -4,7 +4,19 @@
      * Rendered when user selects "Network" in the volume selector.
      * Uses the shared network-store for host data (initialized at app startup).
      */
-    import { getNetworkHosts, getDiscoveryState, isHostResolving } from '$lib/network-store.svelte'
+    import { onMount } from 'svelte'
+    import {
+        getNetworkHosts,
+        getDiscoveryState,
+        isHostResolving,
+        getShareState,
+        getShareCount,
+        isListingShares,
+        isShareDataStale,
+        refreshAllStaleShares,
+        clearShareState,
+        fetchShares,
+    } from '$lib/network-store.svelte'
     import type { NetworkHost } from './types'
 
     interface Props {
@@ -21,6 +33,11 @@
 
     // Local selection state
     let selectedIndex = $state(0)
+
+    // Refresh stale shares when component mounts (entering network view)
+    onMount(() => {
+        refreshAllStaleShares()
+    })
 
     // Handle keyboard navigation
     export function handleKeyDown(e: KeyboardEvent): boolean {
@@ -76,6 +93,65 @@
         if (isHostResolving(host.id)) return 'fetching...'
         return '—'
     }
+
+    // Helper to get share count display - shows "{N}?" when stale
+    function getSharesDisplay(host: NetworkHost): string {
+        const isStale = isShareDataStale(host.id)
+        const count = getShareCount(host.id)
+        if (count !== undefined) {
+            return isStale ? `${count}?` : String(count)
+        }
+        if (isListingShares(host.id)) return '...'
+        return '—'
+    }
+
+    // Check if share data needs refresh indicator
+    function needsRefreshIndicator(host: NetworkHost): boolean {
+        return isShareDataStale(host.id) && getShareCount(host.id) !== undefined
+    }
+
+    // Helper to get status display
+    function getStatusDisplay(host: NetworkHost): string {
+        const state = getShareState(host.id)
+        if (!state) return '—'
+        if (state.status === 'loading') return 'Connecting...'
+        if (state.status === 'error') {
+            if (state.error.type === 'auth_required') return '🔒 Auth required'
+            if (state.error.type === 'timeout') return '⏱️ Timeout'
+            if (state.error.type === 'host_unreachable') return '❌ Unreachable'
+            return '⚠️ Error'
+        }
+        if (state.status === 'loaded') {
+            const stale = isShareDataStale(host.id)
+            if (state.result.authMode === 'guest_allowed') {
+                return stale ? '✓ Guest 🔄' : '✓ Guest'
+            }
+            return stale ? '✓ Connected 🔄' : '✓ Connected'
+        }
+        return '—'
+    }
+
+    // Helper to get error tooltip text
+    function getStatusTooltip(host: NetworkHost): string | undefined {
+        const state = getShareState(host.id)
+        if (state?.status === 'error') {
+            return state.error.message || `Error: ${state.error.type}`
+        }
+        return undefined
+    }
+
+    // Refresh all shares (user-initiated)
+    function handleRefreshClick() {
+        // Clear all share states to force refetch
+        for (const host of hosts) {
+            clearShareState(host.id)
+            if (host.hostname) {
+                fetchShares(host).catch(() => {
+                    // Errors are stored in shareStates, ignore here
+                })
+            }
+        }
+    }
 </script>
 
 <div class="network-browser" class:is-focused={isFocused}>
@@ -112,8 +188,16 @@
                 <span class="col-hostname" class:is-fetching={isHostResolving(host.id) && !host.hostname}
                     >{getHostnameDisplay(host)}</span
                 >
-                <span class="col-shares">—</span>
-                <span class="col-status">—</span>
+                <span
+                    class="col-shares"
+                    class:is-fetching={isListingShares(host.id)}
+                    class:is-stale={needsRefreshIndicator(host)}>{getSharesDisplay(host)}</span
+                >
+                <span
+                    class="col-status"
+                    class:is-error={getShareState(host.id)?.status === 'error'}
+                    title={getStatusTooltip(host)}>{getStatusDisplay(host)}</span
+                >
             </div>
         {/each}
 
@@ -125,6 +209,10 @@
         {:else if hosts.length === 0}
             <div class="empty-state">No network hosts found.</div>
         {/if}
+    </div>
+
+    <div class="refresh-section">
+        <button type="button" class="refresh-button" onclick={handleRefreshClick}> 🔄 Refresh </button>
     </div>
 </div>
 
@@ -238,5 +326,48 @@
         padding: 48px 16px;
         color: var(--color-text-tertiary);
         font-style: italic;
+    }
+
+    .col-shares.is-fetching {
+        font-style: italic;
+        color: var(--color-text-muted);
+    }
+
+    .col-shares.is-stale {
+        color: var(--color-text-muted);
+    }
+
+    .col-status.is-error {
+        color: var(--color-warning);
+        cursor: help;
+    }
+
+    .refresh-section {
+        display: flex;
+        justify-content: center;
+        padding: 16px 8px;
+        border-top: 1px solid var(--color-border-secondary);
+    }
+
+    .refresh-button {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border: 1px solid var(--color-border-primary);
+        border-radius: 6px;
+        background-color: var(--color-bg-secondary);
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .refresh-button:hover {
+        background-color: var(--color-bg-hover);
+    }
+
+    .refresh-button:active {
+        background-color: var(--color-bg-pressed);
     }
 </style>

@@ -127,3 +127,39 @@ export interface NetworkHost {
     /** SMB port (usually 445) */
     port: number
 }
+
+// ============================================================================
+// SMB share types
+// ============================================================================
+
+/** Information about a discovered SMB share. */
+export interface ShareInfo {
+    /** Name of the share (for example, "Documents", "Media") */
+    name: string
+    /** Whether this is a disk share (true) or other type like printer/IPC */
+    isDisk: boolean
+    /** Optional description/comment for the share */
+    comment?: string
+}
+
+/** Authentication mode detected for a host. */
+export type AuthMode = 'guest_allowed' | 'creds_required' | 'unknown'
+
+/** Result of a share listing operation. */
+export interface ShareListResult {
+    /** Shares found on the host (already filtered to disk shares only) */
+    shares: ShareInfo[]
+    /** Authentication mode detected */
+    authMode: AuthMode
+    /** Whether this result came from cache */
+    fromCache: boolean
+}
+
+/** Error types for share listing operations. */
+export type ShareListError =
+    | { type: 'host_unreachable'; message: string }
+    | { type: 'timeout'; message: string }
+    | { type: 'auth_required'; message: string }
+    | { type: 'auth_failed'; message: string }
+    | { type: 'protocol_error'; message: string }
+    | { type: 'resolution_failed'; message: string }

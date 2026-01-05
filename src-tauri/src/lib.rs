@@ -3,13 +3,17 @@
 // Warn on unused dependencies to catch platform-specific cfg mismatches
 #![warn(unused_crate_dependencies)]
 
-//noinspection RsUnusedImport
 // Silence false positives for dev dependencies (used only in benches/, not lib)
 // and transitive dependencies (notify is used by notify-debouncer-full)
 #[cfg(test)]
 use criterion as _;
 //noinspection RsUnusedImport
 use notify as _;
+// smb crates are used in network/smb_client module (macOS only)
+#[cfg(target_os = "macos")]
+use smb as _;
+#[cfg(target_os = "macos")]
+use smb_rpc as _;
 //noinspection RsUnusedImport
 // tokio is used in commands/network.rs for spawn_blocking
 #[cfg(target_os = "macos")]
@@ -177,6 +181,12 @@ pub fn run() {
             commands::network::get_network_discovery_state,
             #[cfg(target_os = "macos")]
             commands::network::resolve_host,
+            #[cfg(target_os = "macos")]
+            commands::network::list_shares_on_host,
+            #[cfg(target_os = "macos")]
+            commands::network::prefetch_shares,
+            #[cfg(target_os = "macos")]
+            commands::network::get_host_auth_mode,
             #[cfg(target_os = "macos")]
             commands::network::fe_log,
             #[cfg(target_os = "macos")]

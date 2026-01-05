@@ -1,9 +1,10 @@
-//! Network host discovery for macOS using Bonjour (mDNS/DNS-SD).
+//! Network host discovery and SMB share listing for macOS.
 //!
-//! Discovers SMB-capable hosts on the local network by listening for `_smb._tcp.local` service
-//! advertisements. Uses Apple's `NSNetServiceBrowser` via objc2 bindings.
+//! Discovers SMB-capable hosts on the local network using Bonjour (mDNS/DNS-SD)
+//! and enumerates shares using the smb-rs crate.
 
 mod bonjour;
+pub mod smb_client;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,6 +12,7 @@ use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 
 pub use bonjour::start_discovery;
+pub use smb_client::{AuthMode, ShareListError, ShareListResult};
 
 /// A discovered network host advertising SMB services.
 #[derive(Debug, Clone, Serialize, Deserialize)]

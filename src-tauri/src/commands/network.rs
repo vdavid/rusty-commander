@@ -1,8 +1,9 @@
-//! Tauri commands for network host discovery.
+//! Tauri commands for network host discovery and SMB share listing.
 
 use crate::network::{
-    DiscoveryState, NetworkHost, get_discovered_hosts, get_discovery_state_value, get_host_for_resolution,
-    resolve_host_ip, service_name_to_hostname, update_host_resolution,
+    AuthMode, DiscoveryState, NetworkHost, ShareListError, ShareListResult, get_discovered_hosts,
+    get_discovery_state_value, get_host_for_resolution, resolve_host_ip, service_name_to_hostname,
+    smb_client, update_host_resolution,
 };
 
 /// Logs a message from the frontend (for debugging).
@@ -54,4 +55,41 @@ pub async fn resolve_host(host_id: String) -> Option<NetworkHost> {
 
     // Update host with results (brief mutex hold)
     update_host_resolution(&host_id, hostname, ip_address)
+}
+
+/// Lists shares available on a network host.
+///
+/// Returns cached results if available (30 second TTL), otherwise queries the host.
+/// Attempts guest access first; returns an error if authentication is required.
+///
+/// # Arguments
+/// * `host_id` - Unique identifier for the host (used for caching)
+/// * `hostname` - Hostname to connect to (for example, "NASPOLYA.local")
+/// * `ip_address` - Optional resolved IP address (preferred over hostname for reliability)
+#[tauri::command]
+pub async fn list_shares_on_host(
+    host_id: String,
+    hostname: String,
+    ip_address: Option<String>,
+) -> Result<ShareListResult, ShareListError> {
+    smb_client::list_shares(&host_id, &hostname, ip_address.as_deref(), None).await
+}
+
+/// Prefetches shares for a host (for example, on hover).
+/// Same as list_shares_on_host but designed for prefetching - errors are silently ignored.
+/// Returns immediately if shares are already cached.
+#[tauri::command]
+pub async fn prefetch_shares(host_id: String, hostname: String, ip_address: Option<String>) {
+    // Fire and forget - we don't care about the result for prefetching
+    let _ = smb_client::list_shares(&host_id, &hostname, ip_address.as_deref(), None).await;
+}
+
+/// Gets auth mode detected for a host (from cached share list if available).
+#[tauri::command]
+pub fn get_host_auth_mode(host_id: String) -> AuthMode {
+    // Try to get from cache
+    if let Some(cached) = smb_client::get_cached_shares_auth_mode(&host_id) {
+        return cached;
+    }
+    AuthMode::Unknown
 }

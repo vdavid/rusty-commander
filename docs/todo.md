@@ -35,6 +35,14 @@
 - [ ] Make sorting configurable (by name, size, date, etc.)
 - [ ] Move all our constants and possibly some env var overrides into settings. Make it a cockpit.
 
+## Distribution
+
+- [ ] Decide on name
+- [ ] Buy aicommander.app?
+- [ ] Create website
+- [ ] Get a design review
+- [ ] Post it on Hacker News, Reddit, etc.
+
 ## Actions
 
 - [ ] Add file selection feature
