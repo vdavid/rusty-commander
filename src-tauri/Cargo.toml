@@ -54,9 +54,14 @@ objc2-foundation = { version = "0.3", features = [
     "NSURL", "NSString", "NSDictionary", "NSDate", "NSArray", "NSValue", "NSError",
     "NSFileManager", "NSNetServices", "NSRunLoop"
 ] }
+smb = "0.11.1"
+smb-rpc = "=0.11.1"
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
+
+[[example]]
+name = "smb_spike"
 
 [[bench]]
 name = "icon_benchmarks"
