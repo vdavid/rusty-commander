@@ -44,7 +44,7 @@ See [share-listing.md](./share-listing.md) for details. Decision: [ADR 013](../.
 
 ### Validation spike
 
-- ⬜ **2.0** Validate `smb-rs` against real servers
+- 🔄 **2.0** Validate `smb-rs` against real servers — [See results](./spike-2.0-results.md)
     - Test against macOS file sharing
     - Test against Synology/QNAP NAS
     - Test against Windows share
