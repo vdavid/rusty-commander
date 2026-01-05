@@ -209,13 +209,12 @@ async fn test_list_shares(
 
     // For list_shares, we need the server name (without the .local suffix)
     // Note: Currently unused as ipc_connect uses hostname with .local for resolution
-    let _server_name = server
-        .strip_suffix(".local")
-        .unwrap_or(server);
-    
+    let _server_name = server.strip_suffix(".local").unwrap_or(server);
+
     // Parse the resolved IP address (which includes port 445)
     // Note: Currently unused - for future use with connect_to_address
-    let _socket_addr: SocketAddr = resolved_ip.parse()
+    let _socket_addr: SocketAddr = resolved_ip
+        .parse()
         .map_err(|e| format!("Invalid socket address: {}", e))?;
 
     // Try to list shares with timeout
@@ -341,4 +340,3 @@ fn print_summary(results: &[TestResult]) {
 
     println!();
 }
-

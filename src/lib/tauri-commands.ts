@@ -10,7 +10,6 @@ import type {
     ListingStartResult,
     NetworkHost,
     ResortResult,
-    ShareListError,
     ShareListResult,
     SortColumn,
     SortOrder,
@@ -358,11 +357,7 @@ export async function resolveNetworkHost(hostId: string): Promise<NetworkHost | 
  * @param ipAddress Optional resolved IP address (preferred over hostname for reliability)
  * @returns Result with shares and auth mode, or error
  */
-export async function listSharesOnHost(
-    hostId: string,
-    hostname: string,
-    ipAddress?: string,
-): Promise<ShareListResult> {
+export async function listSharesOnHost(hostId: string, hostname: string, ipAddress?: string): Promise<ShareListResult> {
     // The Rust command returns Result<ShareListResult, ShareListError>
     // Tauri auto-converts Ok to value and Err to thrown error
     return invoke<ShareListResult>('list_shares_on_host', { hostId, hostname, ipAddress })

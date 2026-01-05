@@ -160,6 +160,7 @@ export type ShareListError =
     | { type: 'host_unreachable'; message: string }
     | { type: 'timeout'; message: string }
     | { type: 'auth_required'; message: string }
+    | { type: 'signing_required'; message: string }
     | { type: 'auth_failed'; message: string }
     | { type: 'protocol_error'; message: string }
     | { type: 'resolution_failed'; message: string }

@@ -6,6 +6,7 @@
 mod bonjour;
 pub mod smb_client;
 
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -84,6 +85,16 @@ pub fn get_discovery_state_value() -> DiscoveryState {
 pub(crate) fn on_host_found(host: NetworkHost, app_handle: &AppHandle) {
     let mut state = get_discovery_state().lock().unwrap();
 
+    let is_new = !state.hosts.contains_key(&host.id);
+    info!(
+        "Host {}: id={}, name={}, ip={:?}, hostname={:?}",
+        if is_new { "ADDED" } else { "UPDATED" },
+        host.id,
+        host.name,
+        host.ip_address,
+        host.hostname
+    );
+
     // Insert or update the host
     state.hosts.insert(host.id.clone(), host.clone());
 
@@ -95,7 +106,11 @@ pub(crate) fn on_host_found(host: NetworkHost, app_handle: &AppHandle) {
 pub(crate) fn on_host_lost(host_id: &str, app_handle: &AppHandle) {
     let mut state = get_discovery_state().lock().unwrap();
 
-    if state.hosts.remove(host_id).is_some() {
+    if let Some(removed) = state.hosts.remove(host_id) {
+        info!(
+            "Host REMOVED: id={}, name={}, ip={:?}",
+            removed.id, removed.name, removed.ip_address
+        );
         // Emit event to frontend
         let _ = app_handle.emit("network-host-lost", serde_json::json!({ "id": host_id }));
     }
@@ -111,6 +126,37 @@ pub(crate) fn on_discovery_state_changed(new_state: DiscoveryState, app_handle: 
         "network-discovery-state-changed",
         serde_json::json!({ "state": new_state }),
     );
+}
+
+/// Called by the Bonjour module when a host's address is resolved via mDNS.
+pub(crate) fn on_host_resolved(
+    host_id: &str,
+    hostname: Option<String>,
+    ip_address: Option<String>,
+    port: u16,
+    app_handle: &AppHandle,
+) {
+    let mut state = get_discovery_state().lock().unwrap();
+
+    // Update the host with resolved info
+    if let Some(host) = state.hosts.get_mut(host_id) {
+        host.hostname = hostname.clone().or(host.hostname.clone());
+        host.ip_address = ip_address.clone().or(host.ip_address.clone());
+        host.port = port;
+
+        info!(
+            "Host RESOLVED: id={}, hostname={:?}, ip={:?}, port={}",
+            host_id, host.hostname, host.ip_address, port
+        );
+
+        // Emit event to frontend with updated host info
+        let _ = app_handle.emit("network-host-resolved", host.clone());
+    } else {
+        warn!(
+            "Host RESOLVED but not found in state: id={}, hostname={:?}, ip={:?}",
+            host_id, hostname, ip_address
+        );
+    }
 }
 
 /// Generates a stable ID from a service name.

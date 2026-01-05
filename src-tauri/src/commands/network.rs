@@ -2,8 +2,8 @@
 
 use crate::network::{
     AuthMode, DiscoveryState, NetworkHost, ShareListError, ShareListResult, get_discovered_hosts,
-    get_discovery_state_value, get_host_for_resolution, resolve_host_ip, service_name_to_hostname,
-    smb_client, update_host_resolution,
+    get_discovery_state_value, get_host_for_resolution, resolve_host_ip, service_name_to_hostname, smb_client,
+    update_host_resolution,
 };
 
 /// Logs a message from the frontend (for debugging).

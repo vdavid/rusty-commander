@@ -31,6 +31,7 @@ const prefetchingHosts = new SvelteSet<string>()
 // Event listeners
 let unlistenHostFound: UnlistenFn | undefined
 let unlistenHostLost: UnlistenFn | undefined
+let unlistenHostResolved: UnlistenFn | undefined
 let unlistenStateChanged: UnlistenFn | undefined
 let initialized = false
 
@@ -81,12 +82,12 @@ function startPrefetchShares(host: NetworkHost) {
 
     prefetchingHosts.add(host.id)
 
-    prefetchSharesCmd(host.id, host.hostname, host.ipAddress)
+    void prefetchSharesCmd(host.id, host.hostname, host.ipAddress)
         .then(() => {
             // Prefetch succeeded - backend has cached it
             if (!shareStates.has(host.id)) {
                 // Trigger a proper fetch to get the cached result and update UI
-                fetchSharesSilent(host)
+                void fetchSharesSilent(host)
             }
         })
         .catch(() => {
@@ -156,6 +157,19 @@ export async function initNetworkDiscovery(): Promise<void> {
         shareStates.delete(id)
     })
 
+    // Listen for host resolution from mDNS (Bonjour NSNetService.resolve())
+    unlistenHostResolved = await listen<NetworkHost>('network-host-resolved', (event) => {
+        const resolved = event.payload
+        // Update the host with resolved info (hostname and IP from mDNS)
+        hosts = hosts.map((h) => (h.id === resolved.id ? { ...h, ...resolved } : h))
+
+        // If we now have hostname and/or IP, prefetch shares
+        const updatedHost = hosts.find((h) => h.id === resolved.id)
+        if (updatedHost && (updatedHost.hostname || updatedHost.ipAddress)) {
+            startPrefetchShares(updatedHost)
+        }
+    })
+
     unlistenStateChanged = await listen<{ state: DiscoveryState }>('network-discovery-state-changed', (event) => {
         discoveryState = event.payload.state
     })
@@ -167,6 +181,7 @@ export async function initNetworkDiscovery(): Promise<void> {
 export function cleanupNetworkDiscovery(): void {
     unlistenHostFound?.()
     unlistenHostLost?.()
+    unlistenHostResolved?.()
     unlistenStateChanged?.()
     initialized = false
 }
@@ -258,36 +273,6 @@ export async function fetchShares(host: NetworkHost): Promise<ShareListResult> {
 }
 
 /**
- * Prefetch shares for a host on hover (debounced externally).
- * Silent - doesn't update loading state or throw errors.
- */
-export function prefetchShares(host: NetworkHost): void {
-    // Skip if already have data, loading, or prefetching
-    if (shareStates.has(host.id) || prefetchingHosts.has(host.id)) {
-        return
-    }
-
-    // Skip if hostname not resolved
-    if (!host.hostname) {
-        return
-    }
-
-    prefetchingHosts.add(host.id)
-
-    prefetchSharesCmd(host.id, host.hostname, host.ipAddress)
-        .then(() => {
-            // Prefetch succeeded - it's cached on backend now
-            // We don't update shareStates here to avoid UI flash
-        })
-        .catch(() => {
-            // Silently ignore prefetch errors
-        })
-        .finally(() => {
-            prefetchingHosts.delete(host.id)
-        })
-}
-
-/**
  * Clear share state for a host (for example, to force refresh).
  */
 export function clearShareState(hostId: string): void {
@@ -303,7 +288,7 @@ export function refreshSharesIfStale(host: NetworkHost): boolean {
     if (isListingShares(host.id)) return false // Already loading
 
     // Trigger background refresh
-    fetchSharesSilent(host)
+    void fetchSharesSilent(host)
     return true
 }
 

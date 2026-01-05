@@ -94,15 +94,15 @@
         return '—'
     }
 
-    // Helper to get share count display - shows "{N}?" when stale
+    // Helper to get share count display - shows "{N}?" when stale, "(unknown)" when no data
     function getSharesDisplay(host: NetworkHost): string {
         const isStale = isShareDataStale(host.id)
         const count = getShareCount(host.id)
         if (count !== undefined) {
-            return isStale ? `${count}?` : String(count)
+            return isStale ? `${String(count)}?` : String(count)
         }
         if (isListingShares(host.id)) return '...'
-        return '—'
+        return '(unknown)'
     }
 
     // Check if share data needs refresh indicator
@@ -110,31 +110,42 @@
         return isShareDataStale(host.id) && getShareCount(host.id) !== undefined
     }
 
-    // Helper to get status display
+    // Helper to get status display - includes ℹ️ when tooltip is available
     function getStatusDisplay(host: NetworkHost): string {
         const state = getShareState(host.id)
         if (!state) return '—'
         if (state.status === 'loading') return 'Connecting...'
         if (state.status === 'error') {
-            if (state.error.type === 'auth_required') return '🔒 Auth required'
-            if (state.error.type === 'timeout') return '⏱️ Timeout'
-            if (state.error.type === 'host_unreachable') return '❌ Unreachable'
-            return '⚠️ Error'
+            const hasTooltip = !!getStatusTooltip(host)
+            const infoIcon = hasTooltip ? ' ℹ️' : ''
+            if (state.error.type === 'auth_required') return `🔒 Auth required${infoIcon}`
+            if (state.error.type === 'signing_required') return `🔒 Auth required${infoIcon}`
+            if (state.error.type === 'timeout') return `⏱️ Timeout${infoIcon}`
+            if (state.error.type === 'host_unreachable') return `❌ Unreachable${infoIcon}`
+            return `⚠️ Error${infoIcon}`
         }
-        if (state.status === 'loaded') {
-            const stale = isShareDataStale(host.id)
-            if (state.result.authMode === 'guest_allowed') {
-                return stale ? '✓ Guest 🔄' : '✓ Guest'
-            }
-            return stale ? '✓ Connected 🔄' : '✓ Connected'
+        // status === 'loaded'
+        const stale = isShareDataStale(host.id)
+        if (state.result.authMode === 'guest_allowed') {
+            return stale ? '✓ Guest 🔄' : '✓ Guest'
         }
-        return '—'
+        return stale ? '✓ Connected 🔄' : '✓ Connected'
     }
 
-    // Helper to get error tooltip text
+    // Helper to get error tooltip text with nuanced explanations
     function getStatusTooltip(host: NetworkHost): string | undefined {
         const state = getShareState(host.id)
         if (state?.status === 'error') {
+            // Provide nuanced tooltips for different auth-related errors
+            if (state.error.type === 'signing_required') {
+                return 'This server requires SMB signing, which needs authenticated access. Provide credentials to connect.'
+            }
+            if (state.error.type === 'auth_required') {
+                return 'This server requires authentication to list shares. Provide credentials to connect.'
+            }
+            if (state.error.type === 'auth_failed') {
+                return 'Authentication failed. Check your credentials and try again.'
+            }
             return state.error.message || `Error: ${state.error.type}`
         }
         return undefined
@@ -284,9 +295,14 @@
         color: var(--color-text-muted);
     }
 
-    .col-shares,
-    .col-status {
+    .col-shares {
         flex: 1;
+        color: var(--color-text-tertiary);
+        text-align: center;
+    }
+
+    .col-status {
+        flex: 2.5;
         color: var(--color-text-tertiary);
         text-align: center;
     }
@@ -338,7 +354,7 @@
     }
 
     .col-status.is-error {
-        color: var(--color-warning);
+        color: var(--color-error);
         cursor: help;
     }
 
@@ -368,6 +384,6 @@
     }
 
     .refresh-button:active {
-        background-color: var(--color-bg-pressed);
+        background-color: var(--color-bg-tertiary);
     }
 </style>
