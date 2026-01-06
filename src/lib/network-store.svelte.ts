@@ -11,6 +11,7 @@ import {
     listen,
     listSharesOnHost,
     prefetchShares as prefetchSharesCmd,
+    getSmbCredentials,
 } from '$lib/tauri-commands'
 import type { UnlistenFn } from '$lib/tauri-commands'
 import type { NetworkHost, DiscoveryState, ShareListResult, ShareListError } from './file-explorer/types'
@@ -27,6 +28,10 @@ type ShareState =
     | { status: 'error'; error: ShareListError; fetchedAt: number }
 const shareStates = new SvelteMap<string, ShareState>()
 const prefetchingHosts = new SvelteSet<string>()
+
+// Credential status tracking - 'unknown' | 'has_creds' | 'no_creds' | 'failed'
+type CredentialStatus = 'unknown' | 'has_creds' | 'no_creds' | 'failed'
+const credentialStatuses = new SvelteMap<string, CredentialStatus>()
 
 // Event listeners
 let unlistenHostFound: UnlistenFn | undefined
@@ -280,6 +285,14 @@ export function clearShareState(hostId: string): void {
 }
 
 /**
+ * Set share state for a host directly.
+ * Use this when you have the result from a successful connection.
+ */
+export function setShareState(hostId: string, result: ShareListResult): void {
+    shareStates.set(hostId, { status: 'loaded', result, fetchedAt: Date.now() })
+}
+
+/**
  * Refresh shares if data is stale.
  * Returns true if refresh was triggered.
  */
@@ -298,5 +311,44 @@ export function refreshSharesIfStale(host: NetworkHost): boolean {
 export function refreshAllStaleShares(): void {
     for (const host of hosts) {
         refreshSharesIfStale(host)
+    }
+}
+
+// ============================================================================
+// Credential status functions
+// ============================================================================
+
+/**
+ * Get credential status for a host (by server name).
+ */
+export function getCredentialStatus(serverName: string): CredentialStatus {
+    const key = serverName.toLowerCase()
+    return credentialStatuses.get(key) ?? 'unknown'
+}
+
+/**
+ * Set credential status for a host.
+ * Call this when credentials succeed or fail.
+ */
+export function setCredentialStatus(serverName: string, status: CredentialStatus): void {
+    const key = serverName.toLowerCase()
+    credentialStatuses.set(key, status)
+}
+
+/**
+ * Check if credentials exist for a host (async, updates status).
+ * Call this on mount to populate credential status.
+ */
+export async function checkCredentialsForHost(serverName: string): Promise<void> {
+    const key = serverName.toLowerCase()
+
+    // Don't re-check if already known
+    if (credentialStatuses.has(key)) return
+
+    try {
+        await getSmbCredentials(serverName, null)
+        credentialStatuses.set(key, 'has_creds')
+    } catch {
+        credentialStatuses.set(key, 'no_creds')
     }
 }

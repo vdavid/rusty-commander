@@ -59,6 +59,7 @@
     let rightPaneRef: FilePane | undefined = $state()
     let unlistenSettings: UnlistenFn | undefined
     let unlistenViewMode: UnlistenFn | undefined
+    let unlistenVolumeMount: UnlistenFn | undefined
     let unlistenVolumeUnmount: UnlistenFn | undefined
     let unlistenNavigation: UnlistenFn | undefined
 
@@ -183,6 +184,12 @@
         // Save the current path for the old volume before switching
         void saveLastUsedPathForVolume(leftVolumeId, leftPath)
 
+        // If this is a new volume (e.g., freshly mounted network share), refresh volume list first
+        const found = volumes.find((v) => v.id === volumeId)
+        if (!found) {
+            volumes = await listVolumes()
+        }
+
         // Pass the right pane's state so we can copy its path if it's on the same volume
         const pathToNavigate = await determineNavigationPath(volumeId, volumePath, targetPath, {
             otherPaneVolumeId: rightVolumeId,
@@ -200,6 +207,11 @@
     async function handleRightVolumeChange(volumeId: string, volumePath: string, targetPath: string) {
         // Save the current path for the old volume before switching
         void saveLastUsedPathForVolume(rightVolumeId, rightPath)
+
+        // If this is a new volume (e.g., freshly mounted network share), refresh volume list first
+        if (!volumes.find((v) => v.id === volumeId)) {
+            volumes = await listVolumes()
+        }
 
         // Pass the left pane's state so we can copy its path if it's on the same volume
         const pathToNavigate = await determineNavigationPath(volumeId, volumePath, targetPath, {
@@ -403,9 +415,25 @@
             }
         })
 
+        // Subscribe to volume mount events (refresh volume list when new volumes appear)
+        unlistenVolumeMount = await listen<{ volumePath: string }>('volume-mounted', () => {
+            void (async () => {
+                volumes = await listVolumes()
+            })()
+        })
+
         // Subscribe to volume unmount events
-        unlistenVolumeUnmount = await listen<{ volumeId: string }>('volume-unmounted', (event) => {
-            void handleVolumeUnmount(event.payload.volumeId)
+        unlistenVolumeUnmount = await listen<{ volumePath: string }>('volume-unmounted', (event) => {
+            void (async () => {
+                // Find the volume ID from the path
+                const volume = volumes.find((v) => v.path === event.payload.volumePath)
+                if (volume) {
+                    void handleVolumeUnmount(volume.id)
+                } else {
+                    // Volume already gone, just refresh the list
+                    volumes = await listVolumes()
+                }
+            })()
         })
 
         // Subscribe to navigation actions from Go menu
@@ -507,6 +535,7 @@
     onDestroy(() => {
         unlistenSettings?.()
         unlistenViewMode?.()
+        unlistenVolumeMount?.()
         unlistenVolumeUnmount?.()
         unlistenNavigation?.()
         cleanupNetworkDiscovery()

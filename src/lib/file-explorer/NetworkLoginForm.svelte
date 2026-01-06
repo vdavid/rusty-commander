@@ -95,6 +95,11 @@
             e.preventDefault()
             onCancel()
         }
+        // Allow Tab/Shift+Tab to navigate between form fields normally
+        // by preventing the event from bubbling to parent handlers (which switch panes)
+        if (e.key === 'Tab') {
+            e.stopPropagation()
+        }
     }
 </script>
 

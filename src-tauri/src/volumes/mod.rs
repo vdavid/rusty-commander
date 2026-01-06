@@ -7,6 +7,8 @@
 //! - Cloud drives (Dropbox, iCloud, Google Drive, etc.)
 //! - Network locations
 
+pub mod watcher;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -62,10 +64,10 @@ pub fn list_locations() -> Vec<LocationInfo> {
     }
 
     // 2. Main volume
-    if let Some(loc) = get_main_volume() {
-        if seen_paths.insert(loc.path.clone()) {
-            locations.push(loc);
-        }
+    if let Some(loc) = get_main_volume()
+        && seen_paths.insert(loc.path.clone())
+    {
+        locations.push(loc);
     }
 
     // 3. Attached volumes
@@ -95,11 +97,17 @@ pub fn list_locations() -> Vec<LocationInfo> {
 /// Get Finder favorites (common user folders).
 fn get_favorites() -> Vec<LocationInfo> {
     let home = dirs::home_dir().unwrap_or_default();
+    let desktop = home.join("Desktop");
+    let documents = home.join("Documents");
+    let downloads = home.join("Downloads");
+    let desktop_str = desktop.to_string_lossy();
+    let documents_str = documents.to_string_lossy();
+    let downloads_str = downloads.to_string_lossy();
     let favorites_paths = [
         ("/Applications", "Applications"),
-        (&home.join("Desktop").to_string_lossy().to_string(), "Desktop"),
-        (&home.join("Documents").to_string_lossy().to_string(), "Documents"),
-        (&home.join("Downloads").to_string_lossy().to_string(), "Downloads"),
+        (desktop_str.as_ref(), "Desktop"),
+        (documents_str.as_ref(), "Documents"),
+        (downloads_str.as_ref(), "Downloads"),
     ];
 
     favorites_paths

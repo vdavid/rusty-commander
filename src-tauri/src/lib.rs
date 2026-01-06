@@ -3,24 +3,26 @@
 // Warn on unused dependencies to catch platform-specific cfg mismatches
 #![warn(unused_crate_dependencies)]
 
+//noinspection RsUnusedImport
 // Silence false positives for dev dependencies (used only in benches/, not lib)
 // and transitive dependencies (notify is used by notify-debouncer-full)
 #[cfg(test)]
 use criterion as _;
 //noinspection RsUnusedImport
 use notify as _;
+//noinspection ALL
 // smb crates are used in network/smb_client module (macOS only)
 #[cfg(target_os = "macos")]
 use smb as _;
+//noinspection ALL
 #[cfg(target_os = "macos")]
 use smb_rpc as _;
-//noinspection RsUnusedImport
-// tokio is used in commands/network.rs for spawn_blocking
-#[cfg(target_os = "macos")]
-use tokio as _;
+
+//noinspection ALL
 // chrono is used in network/known_shares.rs for timestamps
 #[cfg(target_os = "macos")]
 use chrono as _;
+//noinspection ALL
 // security_framework is used in network/keychain.rs for Keychain integration
 #[cfg(target_os = "macos")]
 use security_framework as _;
@@ -90,6 +92,10 @@ pub fn run() {
             // Start network host discovery (Bonjour)
             #[cfg(target_os = "macos")]
             network::start_discovery(app.handle().clone());
+
+            // Start volume mount/unmount watcher
+            #[cfg(target_os = "macos")]
+            volumes::watcher::start_volume_watcher(app.handle());
 
             // Inject Docker SMB test hosts if enabled (dev mode only)
             // Enable with: RUSTY_INJECT_TEST_SMB=1 pnpm tauri dev

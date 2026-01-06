@@ -11,6 +11,7 @@
         SyncStatus,
     } from './types'
     import {
+        findContainingVolume,
         findFileIndex,
         getFileAt,
         getSyncStatus,
@@ -18,6 +19,7 @@
         listDirectoryEnd,
         listDirectoryStart,
         listen,
+        listVolumes,
         mountNetworkShare,
         openFile,
         showFileContextMenu,
@@ -369,15 +371,32 @@
     // Handle going back from ShareBrowser to network host list
     function handleNetworkBack() {
         selectedNetworkHost = null
+        mountError = null
+        lastMountAttempt = null
+    }
+
+    // Handle going back from mount error to share list
+    function handleMountErrorBack() {
+        mountError = null
+        // Stay on the share list (selectedNetworkHost remains set)
     }
 
     // Mounting state
     let isMounting = $state(false)
     let mountError = $state<MountError | null>(null)
 
+    // Track last mount attempt for retry
+    let lastMountAttempt = $state<{
+        share: ShareInfo
+        credentials: { username: string; password: string } | null
+    } | null>(null)
+
     // Handle share selection from ShareBrowser - mount and navigate
     async function handleShareSelect(share: ShareInfo, credentials: { username: string; password: string } | null) {
         if (!selectedNetworkHost) return
+
+        // Store for retry
+        lastMountAttempt = { share, credentials }
 
         isMounting = true
         mountError = null
@@ -397,22 +416,39 @@
             // Navigate to the mounted share
             // Clear network host selection first
             selectedNetworkHost = null
+            lastMountAttempt = null
 
-            // Find the volume for the mounted path and switch to it
             // The mount path is typically /Volumes/<ShareName>
             const mountPath = result.mountPath
 
-            // Use a special volume ID for the network share
-            const volumeId = `smb://${server}/${share.name}`
+            // Refresh the volume list first - the new mount needs to be recognized
+            await listVolumes()
 
-            // Trigger volume change to switch to the mounted share
-            onVolumeChange?.(volumeId, mountPath, mountPath)
+            // Find the actual volume for the mounted path
+            // This ensures proper breadcrumb display and volume context
+            const mountedVolume = await findContainingVolume(mountPath)
+
+            if (mountedVolume) {
+                // Use the real volume ID and path from the system
+                onVolumeChange?.(mountedVolume.id, mountedVolume.path, mountPath)
+            } else {
+                // Fallback: use mount path as both volume path and target
+                // This can happen if the volume list hasn't refreshed yet
+                onVolumeChange?.(mountPath, mountPath, mountPath)
+            }
         } catch (e) {
             mountError = e as MountError
             // eslint-disable-next-line no-console
             console.error('Mount failed:', mountError)
         } finally {
             isMounting = false
+        }
+    }
+
+    // Retry last mount attempt
+    function handleMountRetry() {
+        if (lastMountAttempt) {
+            void handleShareSelect(lastMountAttempt.share, lastMountAttempt.credentials)
         }
     }
     // Helper: Handle navigation result by updating selection and scrolling
@@ -679,8 +715,8 @@
                     <div class="error-title">Couldn't mount share</div>
                     <div class="error-message">{mountError.message}</div>
                     <div class="error-actions">
-                        <button type="button" class="btn" onclick={() => (mountError = null)}>Try again</button>
-                        <button type="button" class="btn" onclick={handleNetworkBack}>Back</button>
+                        <button type="button" class="btn" onclick={handleMountRetry}>Try again</button>
+                        <button type="button" class="btn" onclick={handleMountErrorBack}>Back</button>
                     </div>
                 </div>
             {:else if selectedNetworkHost}

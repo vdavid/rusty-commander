@@ -2,7 +2,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { openPath } from '@tauri-apps/plugin-opener'
-import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event'
+import { type Event, listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
     AuthMode,
     AuthOptions,
@@ -360,7 +360,7 @@ export async function resolveNetworkHost(hostId: string): Promise<NetworkHost | 
  * Returns cached results if available (30 second TTL), otherwise queries the host.
  * Attempts guest access first; returns an error if authentication is required.
  * @param hostId Unique identifier for the host (used for caching)
- * @param hostname Hostname to connect to (for example, "NASPOLYA.local")
+ * @param hostname Hostname to connect to (for example, "TEST_SERVER.local")
  * @param ipAddress Optional resolved IP address (preferred over hostname for reliability)
  * @param port SMB port (default 445, but Docker containers may use different ports)
  * @returns Result with shares and auth mode, or error
@@ -594,7 +594,6 @@ export function isKeychainError(error: unknown): error is KeychainError {
         typeof error === 'object' &&
         error !== null &&
         'type' in error &&
-        typeof (error as KeychainError).type === 'string' &&
         ['not_found', 'access_denied', 'other'].includes((error as KeychainError).type)
     )
 }
@@ -636,7 +635,6 @@ export function isMountError(error: unknown): error is MountError {
         typeof error === 'object' &&
         error !== null &&
         'type' in error &&
-        typeof (error as MountError).type === 'string' &&
         [
             'host_unreachable',
             'share_not_found',

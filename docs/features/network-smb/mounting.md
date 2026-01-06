@@ -6,7 +6,7 @@ How Rusty Commander mounts SMB shares to the local filesystem.
 
 ## Overview
 
-When a user selects a share (like "Documents" on "Naspolya"), the app:
+When a user selects a share (like "TestShare" on "TestServer"), the app:
 
 1. Mounts the share to `/Volumes/<ShareName>` (or similar)
 2. Updates the volume selector to show the mounted share
@@ -109,7 +109,7 @@ Once a share is mounted:
 
 | Error             | User-facing message                   | Action                                       |
 | ----------------- | ------------------------------------- | -------------------------------------------- |
-| Host unreachable  | "Can't connect to Naspolya"           | Suggest checking network connection          |
+| Host unreachable  | "Can't connect to TestServer"         | Suggest checking network connection          |
 | Share not found   | "Share 'Documents' not found"         | Suggest checking share name                  |
 | Auth required     | (Show login form)                     | See [authentication.md](./authentication.md) |
 | Auth failed       | "Invalid username or password"        | Re-show login form                           |
@@ -122,7 +122,7 @@ While mounting, display a loading screen covering the pane:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 📁 Naspolya / Documents                                         │
+│ 📁 TestServer / Documents                                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   ⏳ Mounting "Documents"...                                    │
@@ -153,10 +153,10 @@ Mount operations can hang if the server is slow or unreachable. Use progressive 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 📁 Naspolya / Documents                                         │
+│ 📁 TestServer / Documents                                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   ❌ Couldn't connect to "Documents" on "Naspolya"              │
+│   ❌ Couldn't connect to "Documents" on "TestServer"            │
 │                                                                 │
 │   • Check your network connection                               │
 │   • Make sure the server is available                           │

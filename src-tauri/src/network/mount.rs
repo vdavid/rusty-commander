@@ -7,7 +7,6 @@ use core_foundation::string::CFString;
 use core_foundation::url::CFURL;
 use serde::{Deserialize, Serialize};
 use std::ffi::c_void;
-use std::path::PathBuf;
 use std::ptr;
 
 /// Result of a successful mount operation.
@@ -66,6 +65,7 @@ const ENETFSNOAUTHMECHSUPP: i32 = -5997;
 const ENETFSNOPROTOVERSSUPP: i32 = -5996;
 const USER_CANCELLED_ERR: i32 = -128;
 const ENOENT: i32 = 2;
+const EEXIST: i32 = 17; // Share already mounted
 const EACCES: i32 = 13;
 const ETIMEDOUT: i32 = 60;
 const ECONNREFUSED: i32 = 61;
@@ -73,6 +73,7 @@ const EHOSTUNREACH: i32 = 65;
 const EAUTH: i32 = 80;
 
 /// Map NetFS/POSIX error codes to user-friendly MountError.
+/// Note: EEXIST (17) is handled specially in mount_share_sync, not here.
 fn error_from_code(code: i32, share_name: &str, server_name: &str) -> MountError {
     match code {
         USER_CANCELLED_ERR => MountError::Cancelled {
@@ -105,49 +106,11 @@ fn error_from_code(code: i32, share_name: &str, server_name: &str) -> MountError
     }
 }
 
-/// Check if a share is already mounted and return its path if so.
-///
-/// Note: We only check by share name, not server, since we can't easily
-/// verify the server without parsing the mount table.
-pub fn find_existing_mount(_server: &str, share: &str) -> Option<String> {
-    // Check /Volumes for existing mounts matching this share name
-    // On macOS, SMB shares are typically mounted at /Volumes/<ShareName>
-    let share_path = PathBuf::from("/Volumes").join(share);
-    if share_path.exists() && share_path.is_dir() {
-        // Verify it's actually a mount point for this server by checking if it's a mountpoint
-        // We use a simple heuristic: if /Volumes/<ShareName> exists and is a directory,
-        // it's likely our mount. A more robust check would use statfs() to check the mounted FS.
-        if let Ok(metadata) = std::fs::metadata(&share_path) {
-            if metadata.is_dir() {
-                // Try to verify it's the same server by checking the mount table
-                // For simplicity, we just check if the directory exists and is accessible
-                if std::fs::read_dir(&share_path).is_ok() {
-                    return Some(share_path.to_string_lossy().to_string());
-                }
-            }
-        }
-    }
-
-    // Also check for numbered variants like "ShareName-1", "ShareName-2"
-    for i in 1..10 {
-        let numbered_path = PathBuf::from("/Volumes").join(format!("{}-{}", share, i));
-        if numbered_path.exists() && numbered_path.is_dir() {
-            if std::fs::read_dir(&numbered_path).is_ok() {
-                // We found a numbered mount, but we can't easily verify it's for our server
-                // without parsing mount table. For now, we don't return these as "already mounted"
-                // since we can't be sure they're for the same server.
-                continue;
-            }
-        }
-    }
-
-    None
-}
-
 /// Mount an SMB share to the local filesystem.
 ///
 /// This is a synchronous function that should be called from a spawn_blocking context.
 /// It uses NetFSMountURLSync which handles the mount operation synchronously.
+/// NetFS automatically detects if the share is already mounted and returns the existing path.
 ///
 /// # Arguments
 /// * `server` - Server hostname or IP address
@@ -164,14 +127,6 @@ pub fn mount_share_sync(
     username: Option<&str>,
     password: Option<&str>,
 ) -> Result<MountResult, MountError> {
-    // Check if already mounted
-    if let Some(existing_path) = find_existing_mount(server, share) {
-        return Ok(MountResult {
-            mount_path: existing_path,
-            already_mounted: true,
-        });
-    }
-
     // Build SMB URL: smb://server/share
     let url_string = format!("smb://{}/{}", server, share);
 
@@ -215,6 +170,15 @@ pub fn mount_share_sync(
     };
 
     // Check result
+    // EEXIST (17) means the share is already mounted - this is not an error
+    if result == EEXIST {
+        // Share is already mounted, return success with expected path
+        return Ok(MountResult {
+            mount_path: format!("/Volumes/{}", share),
+            already_mounted: true,
+        });
+    }
+
     if result != 0 {
         return Err(error_from_code(result, share, server));
     }
@@ -249,19 +213,35 @@ pub fn mount_share_sync(
     })
 }
 
-/// Async wrapper for mount_share_sync that runs in a blocking task.
+/// Mount timeout in seconds
+const MOUNT_TIMEOUT_SECS: u64 = 20;
+
+/// Async wrapper for mount_share_sync that runs in a blocking task with timeout.
 pub async fn mount_share(
     server: String,
     share: String,
     username: Option<String>,
     password: Option<String>,
 ) -> Result<MountResult, MountError> {
-    // Use spawn_blocking to avoid blocking the async runtime
-    tokio::task::spawn_blocking(move || mount_share_sync(&server, &share, username.as_deref(), password.as_deref()))
-        .await
-        .map_err(|e| MountError::ProtocolError {
-            message: format!("Mount task failed: {}", e),
-        })?
+    let server_clone = server.clone();
+
+    // Use timeout to prevent hanging indefinitely
+    let mount_future = tokio::task::spawn_blocking(move || {
+        mount_share_sync(&server, &share, username.as_deref(), password.as_deref())
+    });
+
+    match tokio::time::timeout(std::time::Duration::from_secs(MOUNT_TIMEOUT_SECS), mount_future).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(join_error)) => Err(MountError::ProtocolError {
+            message: format!("Mount task failed: {}", join_error),
+        }),
+        Err(_timeout) => Err(MountError::Timeout {
+            message: format!(
+                "Connection to \"{}\" timed out after {} seconds",
+                server_clone, MOUNT_TIMEOUT_SECS
+            ),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -299,8 +279,9 @@ mod tests {
     }
 
     #[test]
-    fn test_find_existing_mount_nonexistent() {
-        // A share that definitely doesn't exist
-        assert!(find_existing_mount("nonexistent-server", "nonexistent-share").is_none());
+    fn test_timeout_constant() {
+        // Verify timeout is reasonable (10-60 seconds)
+        assert!(MOUNT_TIMEOUT_SECS >= 10);
+        assert!(MOUNT_TIMEOUT_SECS <= 60);
     }
 }

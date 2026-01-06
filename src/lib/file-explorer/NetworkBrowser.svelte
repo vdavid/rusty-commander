@@ -16,6 +16,8 @@
         refreshAllStaleShares,
         clearShareState,
         fetchShares,
+        getCredentialStatus,
+        checkCredentialsForHost,
     } from '$lib/network-store.svelte'
     import type { NetworkHost } from './types'
 
@@ -37,6 +39,16 @@
     // Refresh stale shares when component mounts (entering network view)
     onMount(() => {
         refreshAllStaleShares()
+        // Check credentials for all hosts that need auth
+        for (const host of hosts) {
+            const state = getShareState(host.id)
+            if (
+                state?.status === 'error' &&
+                (state.error.type === 'auth_required' || state.error.type === 'signing_required')
+            ) {
+                void checkCredentialsForHost(host.name)
+            }
+        }
     })
 
     // Handle keyboard navigation
@@ -110,38 +122,94 @@
         return isShareDataStale(host.id) && getShareCount(host.id) !== undefined
     }
 
-    // Helper to get status display - includes ℹ️ when tooltip is available
+    // Helper to get error status display with icon
+    function getErrorStatusDisplay(errorType: string, hostName: string, infoIcon: string): string {
+        // Auth required - check if we have stored credentials
+        if (errorType === 'auth_required' || errorType === 'signing_required') {
+            const credStatus = getCredentialStatus(hostName)
+            if (credStatus === 'has_creds') return `🔑 Logged in${infoIcon}`
+            if (credStatus === 'failed') return `⚠️ Login failed${infoIcon}`
+            return `🔒 Login needed${infoIcon}`
+        }
+        if (errorType === 'auth_failed') return `⚠️ Login failed${infoIcon}`
+        if (errorType === 'timeout') return `⏱️ Timeout${infoIcon}`
+        if (errorType === 'host_unreachable') return `❌ Unreachable${infoIcon}`
+        return `⚠️ Error${infoIcon}`
+    }
+
+    // Helper to get status display - shows credential-aware status
     function getStatusDisplay(host: NetworkHost): string {
         const state = getShareState(host.id)
-        if (!state) return '—'
+
+        // No state yet - show helpful status
+        if (!state) {
+            if (isHostResolving(host.id)) return 'Resolving...'
+            if (!host.hostname) return 'Waiting for network...'
+            return 'Not checked'
+        }
+
         if (state.status === 'loading') return 'Connecting...'
+
         if (state.status === 'error') {
             const hasTooltip = !!getStatusTooltip(host)
             const infoIcon = hasTooltip ? ' ℹ️' : ''
-            if (state.error.type === 'auth_required') return `🔒 Auth required${infoIcon}`
-            if (state.error.type === 'signing_required') return `🔒 Auth required${infoIcon}`
-            if (state.error.type === 'timeout') return `⏱️ Timeout${infoIcon}`
-            if (state.error.type === 'host_unreachable') return `❌ Unreachable${infoIcon}`
-            return `⚠️ Error${infoIcon}`
+            return getErrorStatusDisplay(state.error.type, host.name, infoIcon)
         }
+
         // status === 'loaded'
         const stale = isShareDataStale(host.id)
+        const credStatus = getCredentialStatus(host.name)
+
+        // If we have credentials stored, show "Logged in" regardless of auth mode
+        if (credStatus === 'has_creds') {
+            return stale ? '✓ Logged in 🔄' : '✓ Logged in'
+        }
+
+        // Guest access (no stored credentials)
         if (state.result.authMode === 'guest_allowed') {
             return stale ? '✓ Guest 🔄' : '✓ Guest'
         }
         return stale ? '✓ Connected 🔄' : '✓ Connected'
     }
 
+    // Helper to check if status should be styled as an error
+    function isStatusError(host: NetworkHost): boolean {
+        const state = getShareState(host.id)
+        if (!state || state.status !== 'error') return false
+
+        // Auth required with no credentials is NOT an error, just needs action
+        if (state.error.type === 'auth_required' || state.error.type === 'signing_required') {
+            const credStatus = getCredentialStatus(host.name)
+            // Only show as error if login actually failed
+            return credStatus === 'failed'
+        }
+
+        // Other errors (timeout, unreachable, auth_failed) are real errors
+        return true
+    }
+
     // Helper to get error tooltip text with nuanced explanations
     function getStatusTooltip(host: NetworkHost): string | undefined {
         const state = getShareState(host.id)
-        if (state?.status === 'error') {
-            // Provide nuanced tooltips for different auth-related errors
-            if (state.error.type === 'signing_required') {
-                return 'This server requires SMB signing, which needs authenticated access. Provide credentials to connect.'
-            }
-            if (state.error.type === 'auth_required') {
-                return 'This server requires authentication to list shares. Provide credentials to connect.'
+
+        // No state - explain what's happening
+        if (!state) {
+            if (isHostResolving(host.id)) return 'Resolving hostname and IP address...'
+            if (!host.hostname) return 'Waiting for network name resolution'
+            return 'Double-click to connect and view shares'
+        }
+
+        if (state.status === 'error') {
+            // Auth required with credentials context
+            if (state.error.type === 'auth_required' || state.error.type === 'signing_required') {
+                const credStatus = getCredentialStatus(host.name)
+                if (credStatus === 'has_creds') {
+                    return 'Credentials stored. Double-click to connect.'
+                }
+                if (credStatus === 'failed') {
+                    return 'Stored credentials were rejected. Please log in with updated credentials.'
+                }
+                return 'This host requires login. Double-click to enter credentials.'
             }
             if (state.error.type === 'auth_failed') {
                 return 'Authentication failed. Check your credentials and try again.'
@@ -206,7 +274,8 @@
                 >
                 <span
                     class="col-status"
-                    class:is-error={getShareState(host.id)?.status === 'error'}
+                    class:is-error={isStatusError(host)}
+                    class:needs-login={!isStatusError(host) && getShareState(host.id)?.status === 'error'}
                     title={getStatusTooltip(host)}>{getStatusDisplay(host)}</span
                 >
             </div>
@@ -355,6 +424,11 @@
 
     .col-status.is-error {
         color: var(--color-error);
+        cursor: help;
+    }
+
+    .col-status.needs-login {
+        color: var(--color-warning, #f5a623);
         cursor: help;
     }
 

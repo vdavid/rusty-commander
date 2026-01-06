@@ -11,7 +11,7 @@ SMB-capable device advertises itself on the local network, it appears in the Net
 
 Bonjour uses multicast DNS (mDNS) to discover services on the local network without requiring a central directory:
 
-1. **Advertising**: Devices with SMB file sharing broadcast: _"I'm `Naspolya` and I have SMB on port 445"_
+1. **Advertising**: Devices with SMB file sharing broadcast: _"I'm `TestServer` and I have SMB on port 445"_
 2. **Listening**: Our app listens for these broadcasts on multicast address `224.0.0.251`
 3. **Resolution**: When a service is found, we resolve its hostname/IP to connect
 

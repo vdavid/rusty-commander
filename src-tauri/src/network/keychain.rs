@@ -2,14 +2,24 @@
 //!
 //! Uses macOS Security.framework via the security-framework crate
 //! to securely store and retrieve SMB credentials.
+//!
+//! Credentials are cached in-memory after first access to avoid
+//! repeated Keychain dialogs during a session.
 
 use log::{debug, warn};
 use security_framework::passwords::{delete_generic_password, get_generic_password, set_generic_password};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::RwLock;
 
 /// Service name used for Keychain items.
 /// This appears in Keychain Access.app.
 const SERVICE_NAME: &str = "Rusty Commander";
+
+/// In-memory cache for credentials to avoid repeated Keychain dialogs.
+/// Key is the account name (e.g., "smb://server" or "smb://server/share").
+static CREDENTIAL_CACHE: std::sync::LazyLock<RwLock<HashMap<String, SmbCredentials>>> =
+    std::sync::LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Credentials for SMB authentication.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,7 +107,20 @@ pub fn save_credentials(
         let msg = format!("Failed to save credentials: {}", e);
         warn!("{}", msg);
         KeychainError::Other(msg)
-    })
+    })?;
+
+    // Update the in-memory cache
+    if let Ok(mut cache) = CREDENTIAL_CACHE.write() {
+        cache.insert(
+            account,
+            SmbCredentials {
+                username: username.to_string(),
+                password: password.to_string(),
+            },
+        );
+    }
+
+    Ok(())
 }
 
 /// Retrieves SMB credentials from the Keychain.
@@ -112,11 +135,28 @@ pub fn save_credentials(
 pub fn get_credentials(server: &str, share: Option<&str>) -> Result<SmbCredentials, KeychainError> {
     let account = make_account_name(server, share);
 
+    // Check in-memory cache first to avoid Keychain dialog
+    if let Ok(cache) = CREDENTIAL_CACHE.read()
+        && let Some(creds) = cache.get(&account)
+    {
+        debug!("Returning cached credentials for account: {}", account);
+        return Ok(creds.clone());
+    }
+
     debug!("Getting credentials from Keychain for account: {}", account);
 
     match get_generic_password(SERVICE_NAME, &account) {
-        Ok(data) => parse_password_entry(&data)
-            .ok_or_else(|| KeychainError::Other("Invalid credential format in Keychain".to_string())),
+        Ok(data) => {
+            let creds = parse_password_entry(&data)
+                .ok_or_else(|| KeychainError::Other("Invalid credential format in Keychain".to_string()))?;
+
+            // Cache the credentials for future use
+            if let Ok(mut cache) = CREDENTIAL_CACHE.write() {
+                cache.insert(account, creds.clone());
+            }
+
+            Ok(creds)
+        }
         Err(e) => {
             // Check if it's a "not found" error
             let msg = format!("{}", e);
@@ -140,6 +180,11 @@ pub fn delete_credentials(server: &str, share: Option<&str>) -> Result<(), Keych
     let account = make_account_name(server, share);
 
     debug!("Deleting credentials from Keychain for account: {}", account);
+
+    // Remove from cache first
+    if let Ok(mut cache) = CREDENTIAL_CACHE.write() {
+        cache.remove(&account);
+    }
 
     delete_generic_password(SERVICE_NAME, &account).map_err(|e| {
         let msg = format!("{}", e);
@@ -167,20 +212,20 @@ mod tests {
 
     #[test]
     fn test_make_account_name_server_only() {
-        let account = make_account_name("NASPOLYA", None);
-        assert_eq!(account, "smb://naspolya");
+        let account = make_account_name("TEST_SERVER", None);
+        assert_eq!(account, "smb://test_server");
     }
 
     #[test]
     fn test_make_account_name_with_share() {
-        let account = make_account_name("NASPOLYA", Some("Documents"));
-        assert_eq!(account, "smb://naspolya/Documents");
+        let account = make_account_name("TEST_SERVER", Some("Documents"));
+        assert_eq!(account, "smb://test_server/Documents");
     }
 
     #[test]
     fn test_make_account_name_case_insensitive_server() {
-        let account1 = make_account_name("NASPOLYA", Some("Share"));
-        let account2 = make_account_name("naspolya", Some("Share"));
+        let account1 = make_account_name("TEST_SERVER", Some("Share"));
+        let account2 = make_account_name("test_server", Some("Share"));
         assert_eq!(account1, account2);
     }
 

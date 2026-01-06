@@ -161,7 +161,7 @@ pub fn get_cached_shares_auth_mode(host_id: &str) -> Option<AuthMode> {
 ///
 /// # Arguments
 /// * `host_id` - Unique identifier for the host (used for caching)
-/// * `hostname` - Hostname to connect to (for example, "NASPOLYA.local")
+/// * `hostname` - Hostname to connect to (for example, "TEST_SERVER.local")
 /// * `ip_address` - Optional resolved IP address (preferred over hostname)
 /// * `credentials` - Optional (username, password) tuple for authenticated access
 pub async fn list_shares(
@@ -171,8 +171,12 @@ pub async fn list_shares(
     port: u16,
     credentials: Option<(&str, &str)>,
 ) -> Result<ShareListResult, ShareListError> {
-    // Check cache first
-    if let Some(cached) = get_cached_shares(host_id) {
+    // Only use cache for non-authenticated requests.
+    // When credentials are provided, the user is explicitly authenticating
+    // and expects fresh results (not cached guest attempt results).
+    if credentials.is_none()
+        && let Some(cached) = get_cached_shares(host_id)
+    {
         return Ok(cached);
     }
 
@@ -238,28 +242,75 @@ async fn list_shares_smb_rs(
         hostname.strip_suffix(".local").unwrap_or(hostname)
     };
 
+    debug!(
+        "list_shares_smb_rs: server_name={}, has_creds={}",
+        server_name,
+        credentials.is_some()
+    );
+
     // Try guest access first, then authenticated
     let (shares, auth_mode) = match try_list_shares_as_guest(&client, server_name, hostname, ip_address, port).await {
-        Ok(shares) => (shares, AuthMode::GuestAllowed),
+        Ok(shares) => {
+            debug!("Guest access succeeded, got {} raw shares", shares.len());
+            (shares, AuthMode::GuestAllowed)
+        }
         Err(e) if is_auth_error(&e) => {
+            debug!("Guest failed with auth error: {}", e);
             // Guest failed with auth error - try with credentials if provided
             if let Some((user, pass)) = credentials {
-                let shares =
-                    try_list_shares_authenticated(&client, server_name, hostname, ip_address, port, user, pass)
-                        .await
-                        .map_err(|e| classify_error(&e))?;
-                (shares, AuthMode::CredsRequired)
+                debug!("Trying authenticated access with user: {}", user);
+
+                // IMPORTANT: Create a fresh client for authenticated attempt.
+                // smb-rs reuses connections internally, so if we use the same client,
+                // the failed guest connection can interfere with the auth attempt.
+                let mut auth_config = ClientConfig::default();
+                auth_config.connection.allow_unsigned_guest_access = false; // Require proper auth
+                let auth_client = Client::new(auth_config);
+
+                match try_list_shares_authenticated(&auth_client, server_name, hostname, ip_address, port, user, pass)
+                    .await
+                {
+                    Ok(shares) if !shares.is_empty() => {
+                        // smb-rs auth worked and returned shares
+                        debug!("Authenticated access succeeded, got {} raw shares", shares.len());
+                        (shares, AuthMode::CredsRequired)
+                    }
+                    Ok(_) | Err(_) => {
+                        // smb-rs returned 0 shares or failed - fall back to smbutil with auth
+                        // This handles cases where smb-rs internally falls back to guest
+                        debug!("smb-rs auth returned empty or failed, trying smbutil with credentials");
+                        match list_shares_smbutil_with_auth(hostname, ip_address, port, user, pass).await {
+                            Ok(result) => {
+                                debug!("smbutil with auth succeeded, got {} shares", result.shares.len());
+                                return Ok(result);
+                            }
+                            Err(e) => {
+                                debug!("smbutil with auth also failed: {:?}", e);
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
             } else {
+                debug!("No credentials provided, returning AuthRequired");
                 return Err(ShareListError::AuthRequired(
                     "This server requires authentication to list shares".to_string(),
                 ));
             }
         }
-        Err(e) => return Err(classify_error(&e)),
+        Err(e) => {
+            debug!("Guest failed with non-auth error: {}", e);
+            return Err(classify_error(&e));
+        }
     };
 
     // Filter to disk shares only
     let filtered_shares = filter_disk_shares(shares);
+    debug!(
+        "After filtering: {} disk shares (from {} raw)",
+        filtered_shares.len(),
+        filtered_shares.len()
+    );
 
     Ok(ShareListResult {
         shares: filtered_shares,
@@ -326,6 +377,76 @@ async fn list_shares_smbutil(
     })
 }
 
+/// Lists shares using macOS smbutil command WITH credentials.
+/// This is used when smb-rs authentication fails but we have credentials.
+#[cfg(target_os = "macos")]
+async fn list_shares_smbutil_with_auth(
+    hostname: &str,
+    ip_address: Option<&str>,
+    port: u16,
+    username: &str,
+    password: &str,
+) -> Result<ShareListResult, ShareListError> {
+    use std::process::Command;
+
+    // Build the SMB URL with credentials: //user:pass@host:port
+    let host = ip_address.unwrap_or(hostname);
+
+    // URL-encode special characters in password
+    let encoded_password = urlencoding::encode(password);
+
+    let url = if port == 445 {
+        format!("//{}:{}@{}", username, encoded_password, host)
+    } else {
+        format!("//{}:{}@{}:{}", username, encoded_password, host, port)
+    };
+
+    // For logging, hide password
+    let safe_url = if port == 445 {
+        format!("//{}:***@{}", username, host)
+    } else {
+        format!("//{}:***@{}:{}", username, host, port)
+    };
+    debug!("Running smbutil view {}", safe_url);
+
+    // Run smbutil with credentials in URL (no -G flag for guest)
+    let output = tokio::task::spawn_blocking(move || Command::new("smbutil").args(["view", &url]).output())
+        .await
+        .map_err(|e| ShareListError::ProtocolError(format!("Failed to spawn smbutil: {}", e)))?
+        .map_err(|e| ShareListError::ProtocolError(format!("Failed to run smbutil: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        debug!(
+            "smbutil with auth failed: exit={:?}, stderr={}, stdout={}",
+            output.status.code(),
+            stderr,
+            stdout
+        );
+
+        if stderr.contains("Authentication error") || stderr.contains("rejected the authentication") {
+            return Err(ShareListError::AuthFailed("Invalid username or password".to_string()));
+        }
+        return Err(ShareListError::ProtocolError(format!(
+            "smbutil failed: {}",
+            stderr.trim()
+        )));
+    }
+
+    // Parse smbutil output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let shares = parse_smbutil_output(&stdout);
+
+    debug!("smbutil with auth succeeded, got {} shares", shares.len());
+
+    Ok(ShareListResult {
+        shares,
+        auth_mode: AuthMode::CredsRequired,
+        from_cache: false,
+    })
+}
+
 /// Fallback for non-macOS platforms - smbutil is not available.
 #[cfg(not(target_os = "macos"))]
 async fn list_shares_smbutil(
@@ -338,9 +459,23 @@ async fn list_shares_smbutil(
     ))
 }
 
+/// Fallback for non-macOS platforms - smbutil with auth is not available.
+#[cfg(not(target_os = "macos"))]
+async fn list_shares_smbutil_with_auth(
+    _hostname: &str,
+    _ip_address: Option<&str>,
+    _port: u16,
+    _username: &str,
+    _password: &str,
+) -> Result<ShareListResult, ShareListError> {
+    Err(ShareListError::ProtocolError(
+        "smbutil fallback not available on this platform".to_string(),
+    ))
+}
+
 /// Parses smbutil view output to extract share information.
 /// Example output:
-/// ```
+/// ```text
 /// Share                                           Type    Comments
 /// -------------------------------
 /// public                                          Disk
@@ -598,12 +733,11 @@ fn clean_ndr_string(debug_str: &str) -> String {
     // NDR strings come out as things like:
     // Some(NdrAlign { inner: NdrString("Documents") })
     // We extract just the string content
-    if let Some(start) = debug_str.find('"') {
-        if let Some(end) = debug_str.rfind('"') {
-            if start < end {
-                return debug_str[start + 1..end].to_string();
-            }
-        }
+    if let Some(start) = debug_str.find('"')
+        && let Some(end) = debug_str.rfind('"')
+        && start < end
+    {
+        return debug_str[start + 1..end].to_string();
     }
     debug_str.trim_matches('"').to_string()
 }

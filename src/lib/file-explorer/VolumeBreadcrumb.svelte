@@ -216,6 +216,19 @@
         void updateContainingVolume(currentPath)
     })
 
+    // Refresh volumes if the current volumeId is not in our list
+    // This handles the race condition where we navigate to a newly mounted volume
+    // before the mount event is received
+    $effect(() => {
+        if (volumeId && volumeId !== 'network') {
+            const found = volumes.find((v) => v.id === volumeId)
+            if (!found && volumes.length > 0) {
+                // Volume not found but we have a list - might be a newly mounted volume
+                void loadVolumes()
+            }
+        }
+    })
+
     onMount(async () => {
         await loadVolumes()
         await updateContainingVolume(currentPath)

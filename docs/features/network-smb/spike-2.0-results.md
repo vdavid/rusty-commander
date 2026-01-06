@@ -9,11 +9,11 @@ our use case.
 
 ## Test results
 
-### NASPOLYA (QNAP NAS)
+### TEST_SERVER (QNAP NAS)
 
 | Test                | Result  | Notes                                                      |
 | ------------------- | ------- | ---------------------------------------------------------- |
-| DNS resolution      | ✅ Pass | `NASPOLYA.local` → `192.168.1.111:445`                     |
+| DNS resolution      | ✅ Pass | `TEST_SERVER.local` → `192.168.1.111:445`                  |
 | TCP connectivity    | ✅ Pass | Port 445 accessible                                        |
 | SMB negotiation     | ✅ Pass | Connection established                                     |
 | Guest share listing | ❌ Fail | `Logon Failure (0xc000006d)` - NAS requires authentication |
@@ -84,7 +84,7 @@ This is sufficient for our needs.
 
 3. **Implement auth retry logic:**
 
-    ```rust
+    ```
     // Pseudocode auth flow
     1. Try anonymous auth (empty credentials with special handling)
     2. Try "Guest" account if anonymous fails
@@ -101,7 +101,7 @@ This is sufficient for our needs.
 
 Before marking 2.0 complete:
 
-- [ ] Test authenticated access to NASPOLYA with real credentials
+- [ ] Test authenticated access to TEST_SERVER with real credentials
 - [ ] Test using pre-resolved IP with `connect_to_address` + manual session setup
 - [ ] Verify PI and MacShare work when using IP-based connection
 

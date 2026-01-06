@@ -96,10 +96,10 @@ In the future, we could show "Recent connections" in the volume selector:
 
 ```
 📶 Network
-   └── Naspolya (discovered)
+   └── TestServer (discovered)
    └── PI (discovered)
 📜 Recent
-   └── Naspolya / Documents ← From known shares
+   └── TestServer / Documents ← From known shares
    └── PI / media
 ```
 

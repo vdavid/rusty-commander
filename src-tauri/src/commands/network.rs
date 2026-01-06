@@ -64,7 +64,7 @@ pub async fn resolve_host(host_id: String) -> Option<NetworkHost> {
 ///
 /// # Arguments
 /// * `host_id` - Unique identifier for the host (used for caching)
-/// * `hostname` - Hostname to connect to (for example, "NASPOLYA.local")
+/// * `hostname` - Hostname to connect to (for example, "TEST_SERVER.local")
 /// * `ip_address` - Optional resolved IP address (preferred over hostname for reliability)
 /// * `port` - SMB port (default 445, but Docker containers may use different ports)
 #[tauri::command]

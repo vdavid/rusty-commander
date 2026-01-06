@@ -5,12 +5,17 @@
      */
     import { onMount } from 'svelte'
     import type { AuthMode, NetworkHost, ShareInfo, ShareListError } from './types'
-    import { getShareState, fetchShares, clearShareState } from '$lib/network-store.svelte'
+    import {
+        getShareState,
+        fetchShares,
+        clearShareState,
+        setShareState,
+        setCredentialStatus,
+    } from '$lib/network-store.svelte'
     import {
         listSharesWithCredentials,
         saveSmbCredentials,
         getSmbCredentials,
-        hasSmbCredentials,
         updateKnownShare,
     } from '$lib/tauri-commands'
     import NetworkLoginForm from './NetworkLoginForm.svelte'
@@ -61,13 +66,19 @@
             return
         }
         if (cachedState?.status === 'error') {
+            // If auth required, try stored credentials first (keep loading indicator)
+            if (cachedState.error.type === 'auth_required' || cachedState.error.type === 'signing_required') {
+                const success = await tryStoredCredentials()
+                if (success) {
+                    loading = false
+                    return
+                }
+                // No stored credentials, show login form
+                showLoginForm = true
+            }
+            // No stored credentials or they didn't work
             error = cachedState.error
             loading = false
-
-            // If auth required, try stored credentials first
-            if (cachedState.error.type === 'auth_required' || cachedState.error.type === 'signing_required') {
-                await tryStoredCredentials()
-            }
             return
         }
 
@@ -78,33 +89,39 @@
             authMode = result.authMode
         } catch (e) {
             const shareError = e as ShareListError
-            error = shareError
 
-            // If auth required, try stored credentials first
+            // If auth required, try stored credentials first (keep loading indicator)
             if (shareError.type === 'auth_required' || shareError.type === 'signing_required') {
-                await tryStoredCredentials()
+                const success = await tryStoredCredentials()
+                if (success) {
+                    loading = false
+                    return
+                }
+                // No stored credentials, show login form
+                showLoginForm = true
             }
+            error = shareError
         } finally {
             loading = false
         }
     }
 
-    async function tryStoredCredentials() {
+    /** Try to use stored credentials. Returns true if successful. */
+    async function tryStoredCredentials(): Promise<boolean> {
         const serverName = host.name
-        const hasStored = await hasSmbCredentials(serverName, null)
 
-        if (hasStored) {
-            try {
-                const creds = await getSmbCredentials(serverName, null)
-                await connectWithCredentials(creds.username, creds.password, false)
-                return
-            } catch {
-                // Stored credentials failed, show login form
-            }
+        // Try to get credentials directly - don't check hasSmbCredentials first
+        // as that causes an extra Keychain dialog (each Keychain access = 1 dialog)
+        try {
+            const creds = await getSmbCredentials(serverName, null)
+            // Store credentials in memory for mounting later
+            authenticatedCredentials = { username: creds.username, password: creds.password }
+            await connectWithCredentials(creds.username, creds.password, false)
+            return true
+        } catch {
+            // No stored credentials or retrieval failed
+            return false
         }
-
-        // No stored credentials or they failed, show login form
-        showLoginForm = true
     }
 
     async function connectWithCredentials(
@@ -133,6 +150,12 @@
             error = null
             showLoginForm = false
 
+            // Update global share state so NetworkBrowser shows correct info
+            setShareState(host.id, result)
+
+            // Update credential status
+            setCredentialStatus(host.name, username ? 'has_creds' : 'no_creds')
+
             // Store credentials for mounting
             if (username && password) {
                 authenticatedCredentials = { username, password }
@@ -157,6 +180,8 @@
             const shareError = e as ShareListError
             if (shareError.type === 'auth_failed') {
                 loginError = 'Invalid username or password. Please try again.'
+                // Mark credentials as failed
+                setCredentialStatus(host.name, 'failed')
             } else if (shareError.type === 'auth_required' || shareError.type === 'signing_required') {
                 loginError = 'Authentication required. Please enter your credentials.'
             } else {
