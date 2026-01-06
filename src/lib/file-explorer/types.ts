@@ -192,3 +192,21 @@ export interface KnownNetworkShare {
     /** Username used (null for guest) */
     username: string | null
 }
+
+// ============================================================================
+// Keychain types
+// ============================================================================
+
+/** Credentials for SMB authentication. */
+export interface SmbCredentials {
+    /** Username for authentication */
+    username: string
+    /** Password for authentication */
+    password: string
+}
+
+/** Error types for Keychain operations. */
+export type KeychainError =
+    | { type: 'not_found'; message: string }
+    | { type: 'access_denied'; message: string }
+    | { type: 'other'; message: string }

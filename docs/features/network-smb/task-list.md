@@ -10,6 +10,7 @@ See [index.md](./index.md) for an overview of this whole feature. It's a helpful
 - 🔄 In progress
 - ✅ Complete
 - 🔬 Spike/research needed
+- ❌ Not needed
 
 ---
 
@@ -64,7 +65,7 @@ See [share-listing.md](./share-listing.md) for details. Decision: [ADR 013](../.
 - ✅ **2.6** Handle guest vs. authenticated enumeration
 - ✅ **2.7** Implement `smbutil` fallback for edge cases
 - ✅ **2.8** Add timeout handling (10–15 second limit)
-- ⬜ **2.9** Implement connection pool (60 sec TTL, max 20 connections)
+- ❌ **2.9** Implement connection pool (60 sec TTL, max 20 connections)
 - ✅ **2.10** Implement auth mode detection (try guest, detect `GuestAllowed` vs `CredsRequired`)
 - ✅ **2.11** Add unit tests with mocked SMB responses
 
@@ -114,23 +115,23 @@ See [authentication.md](./authentication.md) for details.
 
 ### Backend (Rust)
 
-- ⬜ **4.1** Add `security-framework` crate to dependencies
-- ⬜ **4.2** Implement `save_credentials_to_keychain` function
-- ⬜ **4.3** Implement `get_credentials_from_keychain` function
-- ⬜ **4.4** Implement auth options detection (guest/creds/both)
-- ⬜ **4.5** Create Tauri commands: `check_auth_required`, `save_smb_credentials`, `get_smb_credentials`
-- ⬜ **4.6** Add unit tests with mocked Keychain
+- ✅ **4.1** Add `security-framework` crate to dependencies
+- ✅ **4.2** Implement `save_credentials_to_keychain` function
+- ✅ **4.3** Implement `get_credentials_from_keychain` function
+- ✅ **4.4** Implement auth options detection (guest/creds/both)
+- ✅ **4.5** Create Tauri commands: `check_auth_required`, `save_smb_credentials`, `get_smb_credentials`
+- ✅ **4.6** Add unit tests with mocked Keychain
 
 ### Frontend (Svelte)
 
-- ⬜ **4.7** Create `NetworkLoginForm.svelte` component
-- ⬜ **4.8** Integrate login form into `FilePane.svelte` (replaces file list when auth needed)
-- ⬜ **4.9** Implement guest vs. credentials toggle (when both available)
-- ⬜ **4.10** Pre-fill username from known shares store
-- ⬜ **4.11** Handle "Remember in Keychain" checkbox
-- ⬜ **4.12** Show contextual messages when auth options changed
-- ⬜ **4.13** Handle auth errors with re-prompt
-- ⬜ **4.14** Add frontend tests for all auth scenarios
+- ✅ **4.7** Create `NetworkLoginForm.svelte` component
+- ✅ **4.8** Integrate login form into `FilePane.svelte` (replaces file list when auth needed)
+- ✅ **4.9** Implement guest vs. credentials toggle (when both available)
+- ✅ **4.10** Pre-fill username from known shares store
+- ✅ **4.11** Handle "Remember in Keychain" checkbox
+- ✅ **4.12** Show contextual messages when auth options changed
+- ✅ **4.13** Handle auth errors with re-prompt
+- ✅ **4.14** Add frontend tests for all auth scenarios
 
 ---
 
@@ -149,28 +150,28 @@ See [known-shares-store.md](./known-shares-store.md) for details.
 
 ### Frontend (Svelte)
 
-_Note: 5.7-5.9 are blocked until authentication UI (section 4) is implemented._
-
-- ⬜ **5.7** Read known shares for username pre-fill
-- ⬜ **5.8** Update known shares after successful connection
-- ⬜ **5.9** Compare current auth options with stored to detect changes
-- ✅ **5.10** Add frontend tests (type and logic tests added; integration tests blocked on 5.7-5.9)
+- ✅ **5.7** Read known shares for username pre-fill (implemented in `NetworkLoginForm.svelte`)
+- ✅ **5.8** Update known shares after successful connection (implemented in `ShareBrowser.svelte`)
+- ✅ **5.9** Compare current auth options with stored to detect changes (implemented in `NetworkLoginForm.svelte`)
+- ✅ **5.10** Add frontend tests (type and logic tests added)
 
 ---
 
 ## 6. Pre-mounted shares
 
+Pre-mounted SMB shares (e.g., mounted via Finder) appear automatically in the volume selector because the existing volume listing code at `/Volumes/*` picks them up. The macOS APIs return the correct network share icon.
+
 ### Backend (Rust)
 
-- ⬜ **6.1** Detect network mounts in existing volume listing code
-- ⬜ **6.2** Categorize as `NetworkShare` (or refine existing `AttachedVolume` detection)
-- ⬜ **6.3** Add appropriate icon for network shares
-- ⬜ **6.4** Add unit tests
+- ✅ **6.1** Detect network mounts in existing volume listing code (uses `/Volumes/*` enumeration)
+- ✅ **6.2** Categorize as `AttachedVolume` (works correctly, dedicated category not needed)
+- ✅ **6.3** Add appropriate icon for network shares (uses `get_icon_for_path` which returns macOS system icon)
+- ✅ **6.4** Unit tests (covered by existing volume listing tests)
 
 ### Frontend (Svelte)
 
-- ⬜ **6.5** Display pre-mounted network shares in volume selector
-- ⬜ **6.6** Add frontend tests
+- ✅ **6.5** Display pre-mounted network shares in volume selector (works automatically)
+- ✅ **6.6** Frontend tests (covered by existing tests)
 
 ---
 

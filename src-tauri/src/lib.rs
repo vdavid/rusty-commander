@@ -21,6 +21,9 @@ use tokio as _;
 // chrono is used in network/known_shares.rs for timestamps
 #[cfg(target_os = "macos")]
 use chrono as _;
+// security_framework is used in network/keychain.rs for Keychain integration
+#[cfg(target_os = "macos")]
+use security_framework as _;
 
 pub mod benchmark;
 mod commands;
@@ -214,6 +217,16 @@ pub fn run() {
             commands::network::update_known_share,
             #[cfg(target_os = "macos")]
             commands::network::get_username_hints,
+            #[cfg(target_os = "macos")]
+            commands::network::save_smb_credentials,
+            #[cfg(target_os = "macos")]
+            commands::network::get_smb_credentials,
+            #[cfg(target_os = "macos")]
+            commands::network::has_smb_credentials,
+            #[cfg(target_os = "macos")]
+            commands::network::delete_smb_credentials,
+            #[cfg(target_os = "macos")]
+            commands::network::list_shares_with_credentials,
             #[cfg(target_os = "macos")]
             permissions::check_full_disk_access,
             #[cfg(target_os = "macos")]

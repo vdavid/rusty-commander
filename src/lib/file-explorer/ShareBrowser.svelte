@@ -1,0 +1,449 @@
+<script lang="ts">
+    /**
+     * ShareBrowser - displays shares on a network host.
+     * Shows login form when authentication is required.
+     */
+    import { onMount } from 'svelte'
+    import type { AuthMode, NetworkHost, ShareInfo, ShareListError } from './types'
+    import { getShareState, fetchShares, clearShareState } from '$lib/network-store.svelte'
+    import {
+        listSharesWithCredentials,
+        saveSmbCredentials,
+        getSmbCredentials,
+        hasSmbCredentials,
+        updateKnownShare,
+    } from '$lib/tauri-commands'
+    import NetworkLoginForm from './NetworkLoginForm.svelte'
+
+    interface Props {
+        /** The host we're browsing */
+        host: NetworkHost
+        /** Whether this pane is focused */
+        isFocused?: boolean
+        /** Callback when user selects a share */
+        onShareSelect?: (share: ShareInfo) => void
+        /** Callback to go back to host list */
+        onBack?: () => void
+    }
+
+    const { host, isFocused = false, onShareSelect, onBack }: Props = $props()
+
+    // Local state
+    let shares = $state<ShareInfo[]>([])
+    let authMode = $state<AuthMode>('unknown')
+    let loading = $state(true)
+    let error = $state<ShareListError | null>(null)
+    let selectedIndex = $state(0)
+
+    // Login form state
+    let showLoginForm = $state(false)
+    let loginError = $state<string | undefined>()
+    let isConnecting = $state(false)
+
+    // Load shares on mount
+    onMount(async () => {
+        await loadShares()
+    })
+
+    async function loadShares() {
+        loading = true
+        error = null
+
+        // Check if we have cached share state
+        const cachedState = getShareState(host.id)
+        if (cachedState?.status === 'loaded') {
+            shares = cachedState.result.shares
+            authMode = cachedState.result.authMode
+            loading = false
+            return
+        }
+        if (cachedState?.status === 'error') {
+            error = cachedState.error
+            loading = false
+
+            // If auth required, try stored credentials first
+            if (cachedState.error.type === 'auth_required' || cachedState.error.type === 'signing_required') {
+                await tryStoredCredentials()
+            }
+            return
+        }
+
+        // Fetch shares
+        try {
+            const result = await fetchShares(host)
+            shares = result.shares
+            authMode = result.authMode
+        } catch (e) {
+            const shareError = e as ShareListError
+            error = shareError
+
+            // If auth required, try stored credentials first
+            if (shareError.type === 'auth_required' || shareError.type === 'signing_required') {
+                await tryStoredCredentials()
+            }
+        } finally {
+            loading = false
+        }
+    }
+
+    async function tryStoredCredentials() {
+        const serverName = host.name
+        const hasStored = await hasSmbCredentials(serverName, null)
+
+        if (hasStored) {
+            try {
+                const creds = await getSmbCredentials(serverName, null)
+                await connectWithCredentials(creds.username, creds.password, false)
+                return
+            } catch {
+                // Stored credentials failed, show login form
+            }
+        }
+
+        // No stored credentials or they failed, show login form
+        showLoginForm = true
+    }
+
+    async function connectWithCredentials(
+        username: string | null,
+        password: string | null,
+        rememberInKeychain: boolean,
+    ) {
+        isConnecting = true
+        loginError = undefined
+
+        try {
+            // Clear cached state to force refetch
+            clearShareState(host.id)
+
+            const result = await listSharesWithCredentials(
+                host.id,
+                host.hostname ?? host.name,
+                host.ipAddress,
+                host.port,
+                username,
+                password,
+            )
+
+            shares = result.shares
+            authMode = result.authMode
+            error = null
+            showLoginForm = false
+
+            // Save credentials to Keychain if requested
+            if (rememberInKeychain && username && password) {
+                await saveSmbCredentials(host.name, null, username, password)
+            }
+
+            // Update known shares store
+            await updateKnownShare(
+                host.name,
+                '', // Server-level, not share-specific
+                username ? 'credentials' : 'guest',
+                authMode === 'guest_allowed' ? 'guest_or_credentials' : 'credentials_only',
+                username,
+            )
+        } catch (e) {
+            const shareError = e as ShareListError
+            if (shareError.type === 'auth_failed') {
+                loginError = 'Invalid username or password. Please try again.'
+            } else if (shareError.type === 'auth_required' || shareError.type === 'signing_required') {
+                loginError = 'Authentication required. Please enter your credentials.'
+            } else {
+                loginError = shareError.message || `Connection failed: ${shareError.type}`
+            }
+        } finally {
+            isConnecting = false
+        }
+    }
+
+    function handleConnect(username: string | null, password: string | null, rememberInKeychain: boolean) {
+        void connectWithCredentials(username, password, rememberInKeychain)
+    }
+
+    function handleCancel() {
+        showLoginForm = false
+        onBack?.()
+    }
+
+    function handleShareClick(index: number) {
+        selectedIndex = index
+    }
+
+    function handleShareDoubleClick(index: number) {
+        if (index >= 0 && index < shares.length) {
+            onShareSelect?.(shares[index])
+        }
+    }
+
+    export function handleKeyDown(e: KeyboardEvent): boolean {
+        if (showLoginForm) {
+            // Login form handles its own keyboard events
+            if (e.key === 'Escape') {
+                handleCancel()
+                return true
+            }
+            return false
+        }
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                selectedIndex = Math.min(selectedIndex + 1, shares.length - 1)
+                return true
+            case 'ArrowUp':
+                e.preventDefault()
+                selectedIndex = Math.max(selectedIndex - 1, 0)
+                return true
+            case 'Home':
+                e.preventDefault()
+                selectedIndex = 0
+                return true
+            case 'End':
+                e.preventDefault()
+                selectedIndex = shares.length - 1
+                return true
+            case 'Enter':
+                e.preventDefault()
+                if (selectedIndex >= 0 && selectedIndex < shares.length) {
+                    onShareSelect?.(shares[selectedIndex])
+                }
+                return true
+            case 'Escape':
+            case 'Backspace':
+                e.preventDefault()
+                onBack?.()
+                return true
+        }
+        return false
+    }
+
+    function handleRetry() {
+        error = null
+        showLoginForm = false
+        void loadShares()
+    }
+</script>
+
+<div class="share-browser" class:is-focused={isFocused}>
+    {#if showLoginForm}
+        <NetworkLoginForm
+            {host}
+            {authMode}
+            errorMessage={loginError}
+            {isConnecting}
+            onConnect={handleConnect}
+            onCancel={handleCancel}
+        />
+    {:else if loading}
+        <div class="loading-state">
+            <span class="spinner"></span>
+            Connecting to {host.name}...
+        </div>
+    {:else if error && !showLoginForm}
+        <div class="error-state">
+            <div class="error-icon">❌</div>
+            <div class="error-title">Couldn't connect to {host.name}</div>
+            <div class="error-message">{error.message || error.type}</div>
+            <div class="error-actions">
+                <button type="button" class="btn" onclick={handleRetry}>Retry</button>
+                <button type="button" class="btn" onclick={() => (showLoginForm = true)}>Sign in</button>
+                <button type="button" class="btn" onclick={onBack}>Back</button>
+            </div>
+        </div>
+    {:else if shares.length === 0}
+        <div class="empty-state">
+            <div class="empty-icon">📁</div>
+            <div class="empty-title">No shares available</div>
+            <div class="empty-message">This host has no accessible shares.</div>
+            <button type="button" class="btn" onclick={onBack}>Back</button>
+        </div>
+    {:else}
+        <div class="header-row">
+            <button type="button" class="back-button" onclick={onBack}>← Back</button>
+            <span class="host-name">{host.name}</span>
+            <span class="share-count">{shares.length} {shares.length === 1 ? 'share' : 'shares'}</span>
+        </div>
+        <div class="share-list">
+            {#each shares as share, index (share.name)}
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <div
+                    class="share-row"
+                    class:is-selected={index === selectedIndex}
+                    class:is-highlighted={isFocused && index === selectedIndex}
+                    role="listitem"
+                    onclick={() => {
+                        handleShareClick(index)
+                    }}
+                    ondblclick={() => {
+                        handleShareDoubleClick(index)
+                    }}
+                    onkeydown={() => {}}
+                >
+                    <span class="share-icon">📁</span>
+                    <span class="share-name">{share.name}</span>
+                    {#if share.comment}
+                        <span class="share-comment">{share.comment}</span>
+                    {/if}
+                </div>
+            {/each}
+        </div>
+    {/if}
+</div>
+
+<style>
+    .share-browser {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        font-size: var(--font-size-sm);
+        font-family: var(--font-system), sans-serif;
+    }
+
+    .loading-state,
+    .error-state,
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 24px;
+        gap: 12px;
+        color: var(--color-text-secondary);
+    }
+
+    .spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid var(--color-border-primary);
+        border-top-color: var(--color-accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .error-icon,
+    .empty-icon {
+        font-size: 32px;
+    }
+
+    .error-title,
+    .empty-title {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+    }
+
+    .error-message,
+    .empty-message {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-tertiary);
+        text-align: center;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: 1px solid var(--color-border-primary);
+        border-radius: 6px;
+        background-color: var(--color-bg-secondary);
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .btn:hover {
+        background-color: var(--color-bg-hover);
+    }
+
+    .header-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        background-color: var(--color-bg-secondary);
+        border-bottom: 1px solid var(--color-border-primary);
+    }
+
+    .back-button {
+        padding: 4px 8px;
+        border: 1px solid var(--color-border-primary);
+        border-radius: 4px;
+        background-color: transparent;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+    }
+
+    .back-button:hover {
+        background-color: var(--color-bg-hover);
+    }
+
+    .host-name {
+        font-weight: 500;
+        color: var(--color-text-primary);
+    }
+
+    .share-count {
+        color: var(--color-text-muted);
+        margin-left: auto;
+    }
+
+    .share-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .share-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        cursor: default;
+        border-bottom: 1px solid var(--color-border-secondary);
+    }
+
+    .share-row:hover {
+        background-color: var(--color-bg-hover);
+    }
+
+    .share-row.is-selected {
+        background-color: var(--color-bg-selected-unfocused);
+    }
+
+    .share-row.is-highlighted {
+        background-color: var(--color-bg-selected);
+        color: var(--color-text-selected);
+    }
+
+    .share-icon {
+        font-size: 16px;
+    }
+
+    .share-name {
+        font-weight: 500;
+    }
+
+    .share-comment {
+        color: var(--color-text-tertiary);
+        margin-left: auto;
+        font-size: var(--font-size-xs);
+    }
+
+    .share-row.is-highlighted .share-comment {
+        color: var(--color-text-selected);
+        opacity: 0.8;
+    }
+</style>

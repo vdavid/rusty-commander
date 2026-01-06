@@ -5482,6 +5482,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "plist",
  "rayon",
+ "security-framework",
  "serde",
  "serde_json",
  "smb",

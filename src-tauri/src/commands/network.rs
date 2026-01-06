@@ -143,3 +143,72 @@ pub fn update_known_share(
 pub fn get_username_hints() -> std::collections::HashMap<String, String> {
     known_shares::get_username_hints()
 }
+
+// --- Keychain Commands ---
+
+use crate::network::keychain::{self, KeychainError, SmbCredentials};
+
+/// Saves SMB credentials to the Keychain.
+/// Credentials are stored under "Rusty Commander" service name.
+#[tauri::command]
+pub fn save_smb_credentials(
+    server: String,
+    share: Option<String>,
+    username: String,
+    password: String,
+) -> Result<(), KeychainError> {
+    keychain::save_credentials(&server, share.as_deref(), &username, &password)
+}
+
+/// Retrieves SMB credentials from the Keychain.
+/// Returns the stored username and password if found.
+#[tauri::command]
+pub fn get_smb_credentials(server: String, share: Option<String>) -> Result<SmbCredentials, KeychainError> {
+    keychain::get_credentials(&server, share.as_deref())
+}
+
+/// Checks if credentials exist in the Keychain for a server/share.
+#[tauri::command]
+pub fn has_smb_credentials(server: String, share: Option<String>) -> bool {
+    keychain::has_credentials(&server, share.as_deref())
+}
+
+/// Deletes SMB credentials from the Keychain.
+#[tauri::command]
+pub fn delete_smb_credentials(server: String, share: Option<String>) -> Result<(), KeychainError> {
+    keychain::delete_credentials(&server, share.as_deref())
+}
+
+/// Lists shares on a host using stored or provided credentials.
+/// This is the main command for authenticated share listing.
+///
+/// # Arguments
+/// * `host_id` - Unique identifier for the host (used for caching)
+/// * `hostname` - Hostname to connect to
+/// * `ip_address` - Optional resolved IP address
+/// * `port` - SMB port
+/// * `username` - Username for authentication (or None for guest)
+/// * `password` - Password for authentication (or None for guest)
+#[tauri::command]
+pub async fn list_shares_with_credentials(
+    host_id: String,
+    hostname: String,
+    ip_address: Option<String>,
+    port: u16,
+    username: Option<String>,
+    password: Option<String>,
+) -> Result<ShareListResult, ShareListError> {
+    let credentials = match (username, password) {
+        (Some(u), Some(p)) => Some((u, p)),
+        _ => None,
+    };
+
+    smb_client::list_shares(
+        &host_id,
+        &hostname,
+        ip_address.as_deref(),
+        port,
+        credentials.as_ref().map(|(u, p)| (u.as_str(), p.as_str())),
+    )
+    .await
+}

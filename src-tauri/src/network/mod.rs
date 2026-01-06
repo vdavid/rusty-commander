@@ -4,6 +4,7 @@
 //! and enumerates shares using the smb-rs crate.
 
 mod bonjour;
+pub mod keychain;
 pub mod known_shares;
 pub mod smb_client;
 

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount, tick, untrack } from 'svelte'
-    import type { DirectoryDiff, FileEntry, NetworkHost, SortColumn, SortOrder, SyncStatus } from './types'
+    import type { DirectoryDiff, FileEntry, NetworkHost, ShareInfo, SortColumn, SortOrder, SyncStatus } from './types'
     import {
         findFileIndex,
         getFileAt,
@@ -22,6 +22,7 @@
     import VolumeBreadcrumb from './VolumeBreadcrumb.svelte'
     import PermissionDeniedPane from './PermissionDeniedPane.svelte'
     import NetworkBrowser from './NetworkBrowser.svelte'
+    import ShareBrowser from './ShareBrowser.svelte'
     import * as benchmark from '$lib/benchmark'
     import { handleNavigationShortcut } from './keyboard-shortcuts'
 
@@ -73,9 +74,13 @@
     let briefListRef: BriefList | undefined = $state()
     let volumeBreadcrumbRef: VolumeBreadcrumb | undefined = $state()
     let networkBrowserRef: NetworkBrowser | undefined = $state()
+    let shareBrowserRef: ShareBrowser | undefined = $state()
 
     // Check if we're viewing the network (special virtual volume)
     const isNetworkView = $derived(volumeId === 'network')
+
+    // Network browsing state - which host is selected (if any)
+    let selectedNetworkHost = $state<NetworkHost | null>(null)
 
     // Export method for keyboard shortcut
     export function toggleVolumeChooser() {
@@ -346,11 +351,21 @@
         }
     }
 
-    // Handle network host selection - no-op for now, share listing not implemented
-    function handleNetworkHostSelect(_host: NetworkHost) {
-        // TODO: Future - show shares on this host or attempt to connect
-        // For now, do nothing when user selects a network host
-        void _host // Parameter unused until share listing is implemented
+    // Handle network host selection - show the ShareBrowser
+    function handleNetworkHostSelect(host: NetworkHost) {
+        selectedNetworkHost = host
+    }
+
+    // Handle going back from ShareBrowser to network host list
+    function handleNetworkBack() {
+        selectedNetworkHost = null
+    }
+
+    // Handle share selection from ShareBrowser
+    function handleShareSelect(_share: ShareInfo) {
+        // TODO: Mount the share and navigate to it
+        // For now, just log - mounting will be implemented in task 3.x
+        void _share // Parameter unused until mounting is implemented
     }
     // Helper: Handle navigation result by updating selection and scrolling
     function applyNavigation(newIndex: number, listRef: { scrollToIndex: (index: number) => void } | undefined) {
@@ -413,10 +428,15 @@
 
     // Exported so DualPaneExplorer can forward keyboard events
     export function handleKeyDown(e: KeyboardEvent) {
-        // Delegate to NetworkBrowser when in network view
+        // Delegate to network components when in network view
         if (isNetworkView) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            networkBrowserRef?.handleKeyDown(e)
+            if (selectedNetworkHost) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                shareBrowserRef?.handleKeyDown(e)
+            } else {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                networkBrowserRef?.handleKeyDown(e)
+            }
             return
         }
 
@@ -600,7 +620,17 @@
     </div>
     <div class="content">
         {#if isNetworkView}
-            <NetworkBrowser bind:this={networkBrowserRef} {isFocused} onHostSelect={handleNetworkHostSelect} />
+            {#if selectedNetworkHost}
+                <ShareBrowser
+                    bind:this={shareBrowserRef}
+                    host={selectedNetworkHost}
+                    {isFocused}
+                    onShareSelect={handleShareSelect}
+                    onBack={handleNetworkBack}
+                />
+            {:else}
+                <NetworkBrowser bind:this={networkBrowserRef} {isFocused} onHostSelect={handleNetworkHostSelect} />
+            {/if}
         {:else if loading}
             <LoadingIcon />
         {:else if isPermissionDenied}

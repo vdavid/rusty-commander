@@ -9,11 +9,13 @@ import type {
     ConnectionMode,
     DiscoveryState,
     FileEntry,
+    KeychainError,
     KnownNetworkShare,
     ListingStartResult,
     NetworkHost,
     ResortResult,
     ShareListResult,
+    SmbCredentials,
     SortColumn,
     SortOrder,
     SyncStatus,
@@ -497,4 +499,100 @@ export async function getUsernameHints(): Promise<Record<string, string>> {
         // Command not available (non-macOS) - return empty map
         return {}
     }
+}
+
+// ============================================================================
+// Keychain operations (macOS only)
+// ============================================================================
+
+/**
+ * Saves SMB credentials to the Keychain.
+ * Credentials are stored under "Rusty Commander" service name in Keychain Access.
+ * @param server Server hostname or IP
+ * @param share Optional share name (null for server-level credentials)
+ * @param username Username for authentication
+ * @param password Password for authentication
+ */
+export async function saveSmbCredentials(
+    server: string,
+    share: string | null,
+    username: string,
+    password: string,
+): Promise<void> {
+    await invoke('save_smb_credentials', { server, share, username, password })
+}
+
+/**
+ * Retrieves SMB credentials from the Keychain.
+ * @param server Server hostname or IP
+ * @param share Optional share name (null for server-level credentials)
+ * @returns Stored credentials if found
+ * @throws KeychainError if credentials not found or access denied
+ */
+export async function getSmbCredentials(server: string, share: string | null): Promise<SmbCredentials> {
+    return invoke<SmbCredentials>('get_smb_credentials', { server, share })
+}
+
+/**
+ * Checks if credentials exist in the Keychain for a server/share.
+ * @param server Server hostname or IP
+ * @param share Optional share name
+ * @returns True if credentials are stored
+ */
+export async function hasSmbCredentials(server: string, share: string | null): Promise<boolean> {
+    try {
+        return await invoke<boolean>('has_smb_credentials', { server, share })
+    } catch {
+        return false
+    }
+}
+
+/**
+ * Deletes SMB credentials from the Keychain.
+ * @param server Server hostname or IP
+ * @param share Optional share name
+ */
+export async function deleteSmbCredentials(server: string, share: string | null): Promise<void> {
+    await invoke('delete_smb_credentials', { server, share })
+}
+
+/**
+ * Lists shares on a host using provided credentials.
+ * This is the authenticated version of listSharesOnHost.
+ * @param hostId Unique identifier for the host (used for caching)
+ * @param hostname Hostname to connect to
+ * @param ipAddress Optional resolved IP address
+ * @param port SMB port
+ * @param username Username for authentication (null for guest)
+ * @param password Password for authentication (null for guest)
+ */
+export async function listSharesWithCredentials(
+    hostId: string,
+    hostname: string,
+    ipAddress: string | undefined,
+    port: number,
+    username: string | null,
+    password: string | null,
+): Promise<ShareListResult> {
+    return invoke<ShareListResult>('list_shares_with_credentials', {
+        hostId,
+        hostname,
+        ipAddress,
+        port,
+        username,
+        password,
+    })
+}
+
+/**
+ * Helper to check if an error is a KeychainError
+ */
+export function isKeychainError(error: unknown): error is KeychainError {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'type' in error &&
+        typeof (error as KeychainError).type === 'string' &&
+        ['not_found', 'access_denied', 'other'].includes((error as KeychainError).type)
+    )
 }

@@ -20,6 +20,7 @@
 
 ## Cleanup / housekeeping
 
+- Add "prefer const" ESLint rule
 - A round of refactoring is due
 - Mark macOS vs generic code clearer, and add this to the guide. Is there a way to run some coherence checks for
   `#[cfg(target_os = "macos")]` == true/false separately?
