@@ -209,12 +209,24 @@ All unit tests use mocks—no network or Docker needed. These run on every save/
 
 ### Integration tests (Docker SMB server)
 
-For high-fidelity testing, we spin up a test SMB server:
+For high-fidelity testing, we spin up a farm of Docker SMB test servers. See
+[test-docker-server-list.md](./test-docker-server-list.md) for the container list and rationale, and
+[SMB servers docs](../../testing/smb-servers.md) for setup and usage.
 
-- Container starts once per test suite (not per test)
+**Implementation**: `test/smb-servers/`
+
+- Containers start once per test suite (not per test)
 - Tests run against real SMB protocol
 - Run via `--features integration-tests` flag
 - In CI: Always run. Locally: Optional (developer can skip for faster iteration)
+
+Quick start:
+
+```bash
+./test/smb-servers/start.sh          # Core containers
+./test/smb-servers/start.sh minimal  # Just guest + auth
+./test/smb-servers/start.sh all      # All 17 containers
+```
 
 ### Manual testing checklist
 
