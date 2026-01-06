@@ -1,17 +1,17 @@
 # Setting up SMB test containers on a Linux device
 
-This guide explains how to run the SMB test containers on a Linux device (e.g., Raspberry Pi) so they are
-discoverable via Bonjour/mDNS from your Mac.
+This guide explains how to run the SMB test containers on a Linux device (e.g., Raspberry Pi) so they are discoverable
+via Bonjour/mDNS from your Mac.
 
 ## Why use a separate Linux device?
 
 Running SMB containers on macOS has limitations:
 
-1. **smb-rs + Samba incompatibility**: The smb-rs library uses NDR64 transfer syntax for RPC calls, which Samba
-   doesn't support. This causes `list_shares` to fail.
+1. **smb-rs + Samba incompatibility**: The smb-rs library uses NDR64 transfer syntax for RPC calls, which Samba doesn't
+   support. This causes `list_shares` to fail.
 
-2. **macOS Docker networking**: macOS's Docker runs in a VM, so SMB protocol negotiation sometimes breaks
-   ("Broken pipe" errors with `smbutil`).
+2. **macOS Docker networking**: macOS's Docker runs in a VM, so SMB protocol negotiation sometimes breaks ("Broken pipe"
+   errors with `smbutil`).
 
 Running containers on a Linux device with macvlan networking gives each container a real LAN IP, making them
 indistinguishable from real NAS devices. The `smbutil` fallback in the app works correctly over real network
@@ -65,7 +65,7 @@ networks:
         driver_opts:
             # Change to your device's network interface
             # Check with: ip link show
-            parent: eth0    # or wlan0 for WiFi
+            parent: eth0 # or wlan0 for WiFi
         ipam:
             config:
                 # Update to match your LAN
@@ -90,12 +90,12 @@ cd test/smb-servers
 
 This starts:
 
-| Container | IP | mDNS name | Purpose |
-|-----------|-----|-----------|---------|
-| smb-guest | 192.168.1.200 | smb-guest-test.local | Guest access |
-| smb-auth | 192.168.1.201 | smb-auth-test.local | Requires auth (testuser/testpass) |
-| smb-both | 192.168.1.202 | smb-both-test.local | Guest + auth |
-| smb-readonly | 192.168.1.203 | smb-readonly-test.local | Read-only share |
+| Container    | IP            | mDNS name               | Purpose                           |
+| ------------ | ------------- | ----------------------- | --------------------------------- |
+| smb-guest    | 192.168.1.200 | smb-guest-test.local    | Guest access                      |
+| smb-auth     | 192.168.1.201 | smb-auth-test.local     | Requires auth (testuser/testpass) |
+| smb-both     | 192.168.1.202 | smb-both-test.local     | Guest + auth                      |
+| smb-readonly | 192.168.1.203 | smb-readonly-test.local | Read-only share                   |
 
 ### 6. Verify from your Mac
 
@@ -122,36 +122,39 @@ docker compose -f docker-compose.pi.yml down
 ### Containers not discoverable via mDNS
 
 1. **Check Avahi is running**:
-   ```bash
-   docker exec smb-guest ps aux | grep avahi
-   ```
+
+    ```bash
+    docker exec smb-guest ps aux | grep avahi
+    ```
 
 2. **Check container has correct IP**:
-   ```bash
-   docker inspect smb-guest | grep IPAddress
-   ```
+
+    ```bash
+    docker inspect smb-guest | grep IPAddress
+    ```
 
 3. **Check macvlan network exists**:
-   ```bash
-   docker network ls | grep smb_lan
-   ```
+    ```bash
+    docker network ls | grep smb_lan
+    ```
 
 ### Can't connect from the Pi itself
 
-With macvlan networking, the host can't directly communicate with containers. This is expected.
-Test from another device (your Mac) instead.
+With macvlan networking, the host can't directly communicate with containers. This is expected. Test from another device
+(your Mac) instead.
 
 ### Permission denied / share not accessible
 
 1. **Check container logs**:
-   ```bash
-   docker logs smb-guest
-   ```
+
+    ```bash
+    docker logs smb-guest
+    ```
 
 2. **Verify Samba is running**:
-   ```bash
-   docker exec smb-guest smbclient -L localhost -N
-   ```
+    ```bash
+    docker exec smb-guest smbclient -L localhost -N
+    ```
 
 ## Adding more containers
 

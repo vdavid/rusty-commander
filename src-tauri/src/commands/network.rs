@@ -95,3 +95,51 @@ pub fn get_host_auth_mode(host_id: String) -> AuthMode {
     }
     AuthMode::Unknown
 }
+
+// --- Known Shares Commands ---
+
+use crate::network::known_shares::{
+    self, AuthOptions, ConnectionMode, KnownNetworkShare, get_all_known_shares,
+    get_known_share as get_known_share_inner,
+};
+
+/// Gets all known network shares (previously connected).
+#[tauri::command]
+pub fn get_known_shares() -> Vec<KnownNetworkShare> {
+    get_all_known_shares()
+}
+
+/// Gets a specific known share by server and share name.
+#[tauri::command]
+pub fn get_known_share_by_name(server_name: String, share_name: String) -> Option<KnownNetworkShare> {
+    get_known_share_inner(&server_name, &share_name)
+}
+
+/// Updates or adds a known network share after successful connection.
+#[tauri::command]
+pub fn update_known_share(
+    app: tauri::AppHandle,
+    server_name: String,
+    share_name: String,
+    last_connection_mode: ConnectionMode,
+    last_known_auth_options: AuthOptions,
+    username: Option<String>,
+) {
+    let share = KnownNetworkShare {
+        server_name,
+        share_name,
+        protocol: "smb".to_string(),
+        last_connected_at: chrono::Utc::now().to_rfc3339(),
+        last_connection_mode,
+        last_known_auth_options,
+        username,
+    };
+
+    known_shares::update_known_share(&app, share);
+}
+
+/// Gets username hints for servers (last used username per server).
+#[tauri::command]
+pub fn get_username_hints() -> std::collections::HashMap<String, String> {
+    known_shares::get_username_hints()
+}

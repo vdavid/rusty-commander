@@ -164,3 +164,31 @@ export type ShareListError =
     | { type: 'auth_failed'; message: string }
     | { type: 'protocol_error'; message: string }
     | { type: 'resolution_failed'; message: string }
+
+// ============================================================================
+// Known shares store types
+// ============================================================================
+
+/** Connection mode used for the last successful connection. */
+export type ConnectionMode = 'guest' | 'credentials'
+
+/** Authentication options available for a share. */
+export type AuthOptions = 'guest_only' | 'credentials_only' | 'guest_or_credentials'
+
+/** Information about a known network share (previously connected). */
+export interface KnownNetworkShare {
+    /** Hostname or IP of the server */
+    serverName: string
+    /** Name of the specific share */
+    shareName: string
+    /** Protocol type (currently only "smb") */
+    protocol: string
+    /** When we last successfully connected (ISO 8601) */
+    lastConnectedAt: string
+    /** How we connected last time */
+    lastConnectionMode: ConnectionMode
+    /** Auth options detected last time */
+    lastKnownAuthOptions: AuthOptions
+    /** Username used (null for guest) */
+    username: string | null
+}

@@ -5,6 +5,7 @@
 - VolumeBreadcrumb max height should be window max the panel size (to end within the window). If it'd be longer, make it
   scroll.
 - [...] Big: Make it handle network drives (already planned out! See features/network-smb/\*)
+- Clean up `RUSTY_INJECT_TEST_SMB=1 pnpm tauri dev`, probably not needed
 - [ ] Test with slow drives like network drives
 - [ ] Load iCloud sync statuses, too
 - [ ] Load Google Drive sync statuses, too

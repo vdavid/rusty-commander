@@ -51,8 +51,8 @@ See [share-listing.md](./share-listing.md) for details. Decision: [ADR 013](../.
     - Test against Linux Samba
     - Test guest access and authenticated access
     - Measure latency
-    - **Outcome**: smb-rs works with commercial NAS; has RPC compatibility issues with Samba.
-      Implemented `smbutil` fallback for macOS.
+    - **Outcome**: smb-rs works with commercial NAS; has RPC compatibility issues with Samba. Implemented `smbutil`
+      fallback for macOS.
 
 ### Backend (Rust)
 
@@ -80,7 +80,7 @@ See [share-listing.md](./share-listing.md) for details. Decision: [ADR 013](../.
 - ✅ **2.16** Implement brief caching (~30 seconds) for share lists
 - ✅ **2.17** Handle errors (host unreachable, timeout, auth required)
 - ✅ **2.18** Prefetch on hover (500 ms debounce)
-- ⬜ **2.19** Add frontend tests
+- ✅ **2.19** Add frontend tests
 
 ---
 
@@ -140,19 +140,21 @@ See [known-shares-store.md](./known-shares-store.md) for details.
 
 ### Backend (Rust)
 
-- ⬜ **5.1** Add `KnownNetworkShare` struct to settings types
-- ⬜ **5.2** Add `known_network_shares` field to settings store
-- ⬜ **5.3** Implement `update_known_share` function
-- ⬜ **5.4** Implement `get_known_share` function
-- ⬜ **5.5** Create Tauri commands: `get_known_shares`, `update_known_share`
-- ⬜ **5.6** Add unit tests
+- ✅ **5.1** Add `KnownNetworkShare` struct to settings types
+- ✅ **5.2** Add `known_network_shares` field to settings store
+- ✅ **5.3** Implement `update_known_share` function
+- ✅ **5.4** Implement `get_known_share` function
+- ✅ **5.5** Create Tauri commands: `get_known_shares`, `update_known_share`
+- ✅ **5.6** Add unit tests
 
 ### Frontend (Svelte)
+
+_Note: 5.7-5.9 are blocked until authentication UI (section 4) is implemented._
 
 - ⬜ **5.7** Read known shares for username pre-fill
 - ⬜ **5.8** Update known shares after successful connection
 - ⬜ **5.9** Compare current auth options with stored to detect changes
-- ⬜ **5.10** Add frontend tests
+- ✅ **5.10** Add frontend tests (type and logic tests added; integration tests blocked on 5.7-5.9)
 
 ---
 
@@ -216,11 +218,12 @@ For high-fidelity testing, we spin up a farm of Docker SMB test servers. See
 
 **Two deployment modes:**
 
-1. **Local (macOS)**: Port-mapped containers at `localhost:PORT`. Limited due to Docker networking issues.
-   Use `RUSTY_INJECT_TEST_SMB=1` to inject hosts into the app.
+1. **Local (macOS)**: Port-mapped containers at `localhost:PORT`. Limited due to Docker networking issues. Use
+   `RUSTY_INJECT_TEST_SMB=1` to inject hosts into the app.
 
-2. **Raspberry Pi (recommended)**: Macvlan networking with real LAN IPs. Containers advertise via mDNS/Bonjour
-   and appear automatically in the app. See [Setting up SMB test containers on Linux](../../testing/setting-up-smb-test-containers-on-linux.md).
+2. **Raspberry Pi (recommended)**: Macvlan networking with real LAN IPs. Containers advertise via mDNS/Bonjour and
+   appear automatically in the app. See
+   [Setting up SMB test containers on Linux](../../testing/setting-up-smb-test-containers-on-linux.md).
 
 **Implementation**: `test/smb-servers/`
 

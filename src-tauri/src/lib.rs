@@ -18,6 +18,9 @@ use smb_rpc as _;
 // tokio is used in commands/network.rs for spawn_blocking
 #[cfg(target_os = "macos")]
 use tokio as _;
+// chrono is used in network/known_shares.rs for timestamps
+#[cfg(target_os = "macos")]
+use chrono as _;
 
 pub mod benchmark;
 mod commands;
@@ -89,6 +92,10 @@ pub fn run() {
             // Enable with: RUSTY_INJECT_TEST_SMB=1 pnpm tauri dev
             #[cfg(target_os = "macos")]
             network::inject_test_hosts_if_enabled(app.handle());
+
+            // Load known network shares from disk
+            #[cfg(target_os = "macos")]
+            network::known_shares::load_known_shares(app.handle());
 
             // Initialize font metrics for default font (system font at 12px)
             font_metrics::init_font_metrics(app.handle(), "system-400-12");
@@ -199,6 +206,14 @@ pub fn run() {
             commands::network::get_host_auth_mode,
             #[cfg(target_os = "macos")]
             commands::network::fe_log,
+            #[cfg(target_os = "macos")]
+            commands::network::get_known_shares,
+            #[cfg(target_os = "macos")]
+            commands::network::get_known_share_by_name,
+            #[cfg(target_os = "macos")]
+            commands::network::update_known_share,
+            #[cfg(target_os = "macos")]
+            commands::network::get_username_hints,
             #[cfg(target_os = "macos")]
             permissions::check_full_disk_access,
             #[cfg(target_os = "macos")]

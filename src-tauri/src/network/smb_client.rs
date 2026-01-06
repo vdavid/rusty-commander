@@ -244,9 +244,10 @@ async fn list_shares_smb_rs(
         Err(e) if is_auth_error(&e) => {
             // Guest failed with auth error - try with credentials if provided
             if let Some((user, pass)) = credentials {
-                let shares = try_list_shares_authenticated(&client, server_name, hostname, ip_address, port, user, pass)
-                    .await
-                    .map_err(|e| classify_error(&e))?;
+                let shares =
+                    try_list_shares_authenticated(&client, server_name, hostname, ip_address, port, user, pass)
+                        .await
+                        .map_err(|e| classify_error(&e))?;
                 (shares, AuthMode::CredsRequired)
             } else {
                 return Err(ShareListError::AuthRequired(
@@ -288,19 +289,20 @@ async fn list_shares_smbutil(
     debug!("Running smbutil view -G -N {}", url);
 
     // Run smbutil with guest access (-G) and no password prompt (-N)
-    let output = tokio::task::spawn_blocking(move || {
-        Command::new("smbutil")
-            .args(["view", "-G", "-N", &url])
-            .output()
-    })
-    .await
-    .map_err(|e| ShareListError::ProtocolError(format!("Failed to spawn smbutil: {}", e)))?
-    .map_err(|e| ShareListError::ProtocolError(format!("Failed to run smbutil: {}", e)))?;
+    let output = tokio::task::spawn_blocking(move || Command::new("smbutil").args(["view", "-G", "-N", &url]).output())
+        .await
+        .map_err(|e| ShareListError::ProtocolError(format!("Failed to spawn smbutil: {}", e)))?
+        .map_err(|e| ShareListError::ProtocolError(format!("Failed to run smbutil: {}", e)))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        debug!("smbutil failed: exit={:?}, stderr={}, stdout={}", output.status.code(), stderr, stdout);
+        debug!(
+            "smbutil failed: exit={:?}, stderr={}, stdout={}",
+            output.status.code(),
+            stderr,
+            stdout
+        );
 
         if stderr.contains("Authentication error") || stderr.contains("rejected the authentication") {
             return Err(ShareListError::AuthRequired(
@@ -432,7 +434,10 @@ async fn try_list_shares_as_guest(
                 .await
                 .map_err(|e| format!("Connect to {} failed: {}", ip, e))?;
 
-            debug!("connect_to_address succeeded, now calling ipc_connect with server_name='{}'", server_name);
+            debug!(
+                "connect_to_address succeeded, now calling ipc_connect with server_name='{}'",
+                server_name
+            );
 
             // After connect_to_address, use server_name for IPC (without .local)
             server_name
@@ -691,10 +696,10 @@ ADMIN$                                          Disk    Admin share
 "#;
 
         let shares = parse_smbutil_output(output);
-        
+
         // Should have 4 disk shares (excluding IPC$ and ADMIN$)
         assert_eq!(shares.len(), 4);
-        
+
         // Check names
         let names: Vec<&str> = shares.iter().map(|s| s.name.as_str()).collect();
         assert!(names.contains(&"Public"));
@@ -703,14 +708,14 @@ ADMIN$                                          Disk    Admin share
         assert!(names.contains(&"home"));
         assert!(!names.contains(&"IPC$"));
         assert!(!names.contains(&"ADMIN$"));
-        
+
         // Check that all are marked as disk
         assert!(shares.iter().all(|s| s.is_disk));
-        
+
         // Check comments
         let public = shares.iter().find(|s| s.name == "Public").unwrap();
         assert_eq!(public.comment.as_deref(), Some("System default share"));
-        
+
         let web = shares.iter().find(|s| s.name == "Web").unwrap();
         assert!(web.comment.is_none());
     }

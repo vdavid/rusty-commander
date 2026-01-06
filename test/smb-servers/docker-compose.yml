@@ -25,7 +25,7 @@ services:
         environment:
             - SMB_SHARE_NAME=public
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -45,7 +45,7 @@ services:
         environment:
             - SMB_SHARE_NAME=private
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-U', 'testuser%testpass' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-U', 'testuser%testpass']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -65,7 +65,7 @@ services:
         environment:
             - SMB_SHARE_NAME=mixed
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -95,7 +95,7 @@ services:
         volumes:
             - smb-50shares-data:/shares
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -111,7 +111,7 @@ services:
         environment:
             - DELAY_MS=500
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 15s
             timeout: 10s
             retries: 3
@@ -131,7 +131,7 @@ services:
         environment:
             - SMB_SHARE_NAME=readonly
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -149,7 +149,7 @@ services:
         volumes:
             - smb-ancient-data:/share
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N', '--option=client min protocol=NT1' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N', '--option=client min protocol=NT1']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -169,7 +169,7 @@ services:
         environment:
             - SMB_SHARE_NAME=signed
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -187,7 +187,7 @@ services:
         volumes:
             - smb-unicode-data:/shares
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -201,7 +201,7 @@ services:
         volumes:
             - smb-longnames-data:/shares
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -215,7 +215,7 @@ services:
         volumes:
             - smb-deepnest-data:/share
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -229,7 +229,7 @@ services:
         volumes:
             - smb-manyfiles-data:/share
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -253,7 +253,7 @@ services:
         environment:
             - SMB_SHARE_NAME=Users
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -267,7 +267,7 @@ services:
         volumes:
             - smb-like-synology-data:/shares
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3
@@ -287,7 +287,7 @@ services:
         environment:
             - SMB_SHARE_NAME=share
         healthcheck:
-            test: [ 'CMD', 'smbclient', '-L', 'localhost', '-N' ]
+            test: ['CMD', 'smbclient', '-L', 'localhost', '-N']
             interval: 10s
             timeout: 5s
             retries: 3

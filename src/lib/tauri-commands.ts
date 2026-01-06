@@ -5,8 +5,11 @@ import { openPath } from '@tauri-apps/plugin-opener'
 import { listen, type UnlistenFn, type Event } from '@tauri-apps/api/event'
 import type {
     AuthMode,
+    AuthOptions,
+    ConnectionMode,
     DiscoveryState,
     FileEntry,
+    KnownNetworkShare,
     ListingStartResult,
     NetworkHost,
     ResortResult,
@@ -416,4 +419,82 @@ export function feLog(message: string): void {
         // eslint-disable-next-line no-console -- We do want to log to the console here
         console.log('[FE]', message)
     })
+}
+
+// ============================================================================
+// Known shares store (macOS only)
+// ============================================================================
+
+/**
+ * Gets all known network shares (previously connected).
+ * Only available on macOS.
+ * @returns Array of KnownNetworkShare objects
+ */
+export async function getKnownShares(): Promise<KnownNetworkShare[]> {
+    try {
+        return await invoke<KnownNetworkShare[]>('get_known_shares')
+    } catch {
+        // Command not available (non-macOS) - return empty array
+        return []
+    }
+}
+
+/**
+ * Gets a specific known share by server and share name.
+ * Only available on macOS.
+ * @param serverName Server hostname or IP
+ * @param shareName Share name
+ * @returns KnownNetworkShare if found, null otherwise
+ */
+export async function getKnownShareByName(serverName: string, shareName: string): Promise<KnownNetworkShare | null> {
+    try {
+        return await invoke<KnownNetworkShare | null>('get_known_share_by_name', { serverName, shareName })
+    } catch {
+        // Command not available (non-macOS) - return null
+        return null
+    }
+}
+
+/**
+ * Updates or adds a known network share after successful connection.
+ * Only available on macOS.
+ * @param serverName Server hostname or IP
+ * @param shareName Share name
+ * @param lastConnectionMode How we connected (guest or credentials)
+ * @param lastKnownAuthOptions Available auth options
+ * @param username Username used (null for guest)
+ */
+export async function updateKnownShare(
+    serverName: string,
+    shareName: string,
+    lastConnectionMode: ConnectionMode,
+    lastKnownAuthOptions: AuthOptions,
+    username: string | null,
+): Promise<void> {
+    try {
+        await invoke('update_known_share', {
+            serverName,
+            shareName,
+            lastConnectionMode,
+            lastKnownAuthOptions,
+            username,
+        })
+    } catch {
+        // Command not available (non-macOS) - silently fail
+    }
+}
+
+/**
+ * Gets username hints for servers (last used username per server).
+ * Useful for pre-filling login forms.
+ * Only available on macOS.
+ * @returns Map of server name (lowercase) → username
+ */
+export async function getUsernameHints(): Promise<Record<string, string>> {
+    try {
+        return await invoke<Record<string, string>>('get_username_hints')
+    } catch {
+        // Command not available (non-macOS) - return empty map
+        return {}
+    }
 }

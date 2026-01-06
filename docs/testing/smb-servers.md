@@ -59,6 +59,7 @@ smbutil view -G -N //smb-guest-test.local
 ```
 
 The containers will appear in the app's Network browser via Bonjour as:
+
 - `smb-guest-test.local` (192.168.1.200)
 - `smb-auth-test.local` (192.168.1.201)
 - `smb-both-test.local` (192.168.1.202)
@@ -81,8 +82,6 @@ This injects all 16 Docker hosts into the network discovery list with names like
 pre-resolved to `127.0.0.1` with the correct port, so they work immediately for browsing shares.
 
 > **Note**: This only works in dev builds (`debug_assertions`). Production builds ignore this env var.
-
-
 
 ## Container list
 
@@ -262,14 +261,18 @@ The `smb-rs` crate has a known compatibility issue with Samba's DCE-RPC implemen
 Specifically, smb-rs uses NDR64 transfer syntax which Samba may not support for SRVSVC (Server Service) RPC calls.
 
 **Symptoms:**
+
 - Docker SMB containers show as "Reachable" but fail to list shares
-- Error: `BindAck result for syntax (71710533-beba-4937-8319-b5dbef9ccc36/1) was not acceptance: ProviderRejection, reason: ProposedTransferSyntaxesNotSupported`
+- Error:
+  `BindAck result for syntax (71710533-beba-4937-8319-b5dbef9ccc36/1) was not acceptance: ProviderRejection, reason: ProposedTransferSyntaxesNotSupported`
 
 **Impact:**
+
 - Docker-based Samba containers cannot be used for share listing tests
 - Real NAS devices (QNAP, Synology, Windows) typically work fine as they use different RPC implementations
 
 **Workarounds:**
+
 1. Test against real SMB servers on your network (QNAP, Synology, Windows)
 2. Use the Docker containers for connection/authentication testing only
 3. Follow [smb-rs GitHub issues](https://github.com/afiffon/smb-rs/issues) for updates

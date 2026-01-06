@@ -4,6 +4,7 @@
 //! and enumerates shares using the smb-rs crate.
 
 mod bonjour;
+pub mod known_shares;
 pub mod smb_client;
 
 use log::{info, warn};
@@ -28,7 +29,6 @@ pub fn inject_test_hosts_if_enabled(app_handle: &tauri::AppHandle) {
 /// No-op in release builds.
 #[cfg(not(debug_assertions))]
 pub fn inject_test_hosts_if_enabled(_app_handle: &tauri::AppHandle) {}
-
 
 /// A discovered network host advertising SMB services.
 #[derive(Debug, Clone, Serialize, Deserialize)]
