@@ -51,6 +51,8 @@
         onVolumeChange?: (volumeId: string, volumePath: string, targetPath: string) => void
         onSortChange?: (column: SortColumn) => void
         onRequestFocus?: () => void
+        /** Called when network host selection changes (for history tracking) */
+        onNetworkHostChange?: (host: NetworkHost | null) => void
     }
 
     const {
@@ -66,6 +68,7 @@
         onVolumeChange,
         onSortChange,
         onRequestFocus,
+        onNetworkHostChange,
     }: Props = $props()
 
     let currentPath = $state(untrack(() => initialPath))
@@ -134,6 +137,18 @@
     // Force refresh the view by incrementing cache generation
     export function refreshView(): void {
         cacheGeneration++
+    }
+
+    // Set network host state (for history navigation)
+    export function setNetworkHost(host: NetworkHost | null): void {
+        selectedNetworkHost = host
+        mountError = null
+        lastMountAttempt = null
+    }
+
+    // Get current network host (for history tracking)
+    export function getNetworkHost(): NetworkHost | null {
+        return selectedNetworkHost
     }
 
     // Navigate to parent directory, selecting the folder we came from
@@ -366,6 +381,7 @@
     // Handle network host selection - show the ShareBrowser
     function handleNetworkHostSelect(host: NetworkHost) {
         selectedNetworkHost = host
+        onNetworkHostChange?.(host)
     }
 
     // Handle going back from ShareBrowser to network host list
@@ -373,6 +389,7 @@
         selectedNetworkHost = null
         mountError = null
         lastMountAttempt = null
+        onNetworkHostChange?.(null)
     }
 
     // Handle going back from mount error to share list

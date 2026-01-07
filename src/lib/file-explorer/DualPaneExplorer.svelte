@@ -22,15 +22,16 @@
         DEFAULT_VOLUME_ID,
         type UnlistenFn,
     } from '$lib/tauri-commands'
-    import type { VolumeInfo, SortColumn, SortOrder } from './types'
+    import type { VolumeInfo, SortColumn, SortOrder, NetworkHost } from './types'
     import { defaultSortOrders, DEFAULT_SORT_BY } from './types'
     import { ensureFontMetricsLoaded } from '$lib/font-metrics'
     import {
         createHistory,
         push,
+        pushPath,
         back,
         forward,
-        getCurrentPath,
+        getCurrentEntry,
         canGoBack,
         canGoForward,
         type NavigationHistory,
@@ -64,8 +65,9 @@
     let unlistenNavigation: UnlistenFn | undefined
 
     // Navigation history for each pane (per-pane, session-only)
-    let leftHistory = $state<NavigationHistory>(createHistory('~'))
-    let rightHistory = $state<NavigationHistory>(createHistory('~'))
+    // Initialize with default volume - will be updated on mount with actual state
+    let leftHistory = $state<NavigationHistory>(createHistory(DEFAULT_VOLUME_ID, '~'))
+    let rightHistory = $state<NavigationHistory>(createHistory(DEFAULT_VOLUME_ID, '~'))
 
     // Derived volume paths - handle 'network' virtual volume specially
     const leftVolumePath = $derived(
@@ -77,7 +79,8 @@
 
     function handleLeftPathChange(path: string) {
         leftPath = path
-        leftHistory = push(leftHistory, path)
+        // Use pushPath to keep current volumeId (directory navigation within volume)
+        leftHistory = pushPath(leftHistory, path)
         void saveAppStatus({ leftPath: path })
         void saveLastUsedPathForVolume(leftVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
@@ -86,10 +89,32 @@
 
     function handleRightPathChange(path: string) {
         rightPath = path
-        rightHistory = push(rightHistory, path)
+        // Use pushPath to keep current volumeId (directory navigation within volume)
+        rightHistory = pushPath(rightHistory, path)
         void saveAppStatus({ rightPath: path })
         void saveLastUsedPathForVolume(rightVolumeId, path)
         // Re-focus to maintain keyboard handling after navigation
+        containerElement?.focus()
+    }
+
+    // Handle network host selection changes (for history tracking)
+    function handleLeftNetworkHostChange(host: NetworkHost | null) {
+        // Push to history with network host state
+        leftHistory = push(leftHistory, {
+            volumeId: 'network',
+            path: 'smb://',
+            networkHost: host ?? undefined,
+        })
+        containerElement?.focus()
+    }
+
+    function handleRightNetworkHostChange(host: NetworkHost | null) {
+        // Push to history with network host state
+        rightHistory = push(rightHistory, {
+            volumeId: 'network',
+            path: 'smb://',
+            networkHost: host ?? undefined,
+        })
         containerElement?.focus()
     }
 
@@ -199,6 +224,9 @@
         leftVolumeId = volumeId
         leftPath = pathToNavigate
 
+        // Push volume change to history (this enables back/forward across volumes)
+        leftHistory = push(leftHistory, { volumeId, path: pathToNavigate })
+
         // Focus the left pane after successful volume selection
         focusedPane = 'left'
         void saveAppStatus({ leftVolumeId: volumeId, leftPath: pathToNavigate, focusedPane: 'left' })
@@ -221,6 +249,9 @@
 
         rightVolumeId = volumeId
         rightPath = pathToNavigate
+
+        // Push volume change to history (this enables back/forward across volumes)
+        rightHistory = push(rightHistory, { volumeId, path: pathToNavigate })
 
         // Focus the right pane after successful volume selection
         focusedPane = 'right'
@@ -387,9 +418,9 @@
             rightVolumeId = rightContaining?.id ?? defaultId
         }
 
-        // Initialize history with loaded paths
-        leftHistory = createHistory(status.leftPath)
-        rightHistory = createHistory(status.rightPath)
+        // Initialize history with loaded paths and their volumes
+        leftHistory = createHistory(leftVolumeId, status.leftPath)
+        rightHistory = createHistory(rightVolumeId, status.rightPath)
 
         initialized = true
 
@@ -485,20 +516,43 @@
     }
 
     /**
-     * Updates pane state after navigating back/forward (doesn't push to history).
+     * Updates pane state after navigating back/forward (restores full state from history entry).
+     * This includes both path AND volumeId changes - enabling back/forward across volumes.
      */
     function updatePaneAfterHistoryNavigation(isLeft: boolean, newHistory: NavigationHistory, targetPath: string) {
+        const entry = getCurrentEntry(newHistory)
+        const paneRef = isLeft ? leftPaneRef : rightPaneRef
+
         if (isLeft) {
             leftHistory = newHistory
             leftPath = targetPath
-            void saveAppStatus({ leftPath: targetPath })
-            void saveLastUsedPathForVolume(leftVolumeId, targetPath)
+            // Restore volume context if it changed
+            if (entry.volumeId !== leftVolumeId) {
+                leftVolumeId = entry.volumeId
+                void saveAppStatus({ leftVolumeId: entry.volumeId, leftPath: targetPath })
+            } else {
+                void saveAppStatus({ leftPath: targetPath })
+            }
+            void saveLastUsedPathForVolume(entry.volumeId, targetPath)
         } else {
             rightHistory = newHistory
             rightPath = targetPath
-            void saveAppStatus({ rightPath: targetPath })
-            void saveLastUsedPathForVolume(rightVolumeId, targetPath)
+            // Restore volume context if it changed
+            if (entry.volumeId !== rightVolumeId) {
+                rightVolumeId = entry.volumeId
+                void saveAppStatus({ rightVolumeId: entry.volumeId, rightPath: targetPath })
+            } else {
+                void saveAppStatus({ rightPath: targetPath })
+            }
+            void saveLastUsedPathForVolume(entry.volumeId, targetPath)
         }
+
+        // Restore network host state if navigating within network volume
+        if (entry.volumeId === 'network') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            paneRef?.setNetworkHost?.(entry.networkHost ?? null)
+        }
+
         containerElement?.focus()
     }
 
@@ -526,9 +580,20 @@
             return
         }
 
-        const targetPath = await resolveValidPath(getCurrentPath(newHistory))
-        if (targetPath !== null) {
-            updatePaneAfterHistoryNavigation(isLeft, newHistory, targetPath)
+        // Get the target entry (includes volumeId, path, and network state)
+        const targetEntry = getCurrentEntry(newHistory)
+
+        // For network virtual volume, path resolution doesn't apply
+        // (network browser handles its own state)
+        if (targetEntry.volumeId === 'network') {
+            updatePaneAfterHistoryNavigation(isLeft, newHistory, targetEntry.path)
+            return
+        }
+
+        // For real volumes, resolve path to handle deleted folders
+        const resolvedPath = await resolveValidPath(targetEntry.path)
+        if (resolvedPath !== null) {
+            updatePaneAfterHistoryNavigation(isLeft, newHistory, resolvedPath)
         }
     }
 
@@ -573,6 +638,7 @@
             onVolumeChange={handleLeftVolumeChange}
             onRequestFocus={handleLeftFocus}
             onSortChange={handleLeftSortChange}
+            onNetworkHostChange={handleLeftNetworkHostChange}
         />
         <FilePane
             bind:this={rightPaneRef}
@@ -588,6 +654,7 @@
             onVolumeChange={handleRightVolumeChange}
             onRequestFocus={handleRightFocus}
             onSortChange={handleRightSortChange}
+            onNetworkHostChange={handleRightNetworkHostChange}
         />
     {:else}
         <LoadingIcon />
