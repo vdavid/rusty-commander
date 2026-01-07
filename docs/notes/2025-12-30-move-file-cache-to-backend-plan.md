@@ -57,7 +57,7 @@ All "session" references become "listing":
 
 ### 1.2 New Tauri commands
 
-```rust
+```
 /// Get a range of entries (for virtual scrolling)
 /// Returns entries with sync status included.
 #[tauri::command]
@@ -89,17 +89,17 @@ fn get_file_at(
 ) -> Result<Option<FileEntry>, String>
 ```
 
-### 1.3 Modify [list_directory_start](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src-tauri/src/file_system/operations.rs#284-334)
+### 1.3 Modify [list_directory_start](../../src-tauri/src/file_system/operations.rs)
 
 **Current return:**
 
-```rust
+```
 SessionStartResult { session_id, total_count, entries: Vec<FileEntry>, has_more }
 ```
 
 **New return:**
 
-```rust
+```
 ListingStartResult { listing_id, total_count }  // No entries!
 ```
 
@@ -107,9 +107,7 @@ The `include_hidden` param is passed at start to get correct initial `total_coun
 
 ### 1.4 Sync status in FileEntry
 
-Add sync status to
-[FileEntry](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src-tauri/src/file_system/operations.rs#92-113)
-struct so it's returned with file data:
+Add sync status to [FileEntry](../../src-tauri/src/file_system/operations.rs) struct so it's returned with file data:
 
 ```rust
 pub struct FileEntry {
@@ -126,10 +124,8 @@ Fetch sync status when populating range response.
 
 ### 2.1 Delete files
 
-- [src/lib/file-explorer/FileDataStore.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileDataStore.ts)
-  → DELETE
-- [src/lib/file-explorer/FileDataStore.test.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileDataStore.test.ts)
-  → DELETE
+- src/lib/file-explorer/FileDataStore.ts → DELETE
+- src/lib/file-explorer/FileDataStore.test.ts → DELETE
 
 ### 2.2 Update FilePane.svelte
 
@@ -218,8 +214,8 @@ function onScroll() {
 **Location**: Rust
 
 **Implementation**: APIs accept `include_hidden: bool`. Rust iterates
-[entries](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src-tauri/src/file_system/mock_provider_test.rs#6-50)
-and skips hidden files when calculating indices/ranges if `include_hidden = false`.
+[entries](../../src-tauri/src/file_system/mock_provider_test.rs) and skips hidden files when calculating indices/ranges
+if `include_hidden = false`.
 
 ### 3.2 File watcher with index shifting
 
@@ -264,9 +260,8 @@ When navigating up, call:
 
 **Location**: Rust
 
-Include `sync_status` in
-[FileEntry](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src-tauri/src/file_system/operations.rs#92-113).
-Fetch when building range response (Dropbox SDK calls are already async-friendly).
+Include `sync_status` in [FileEntry](../../src-tauri/src/file_system/operations.rs). Fetch when building range response
+(Dropbox SDK calls are already async-friendly).
 
 ### 3.5 Max filename width
 
@@ -278,13 +273,13 @@ TODO: Consider char-width lookup table in Rust, or estimate based on extension +
 
 ## Deleted complexity
 
-| Removed                                                                                                                                                                                                                                                                                                                        | Reason             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
-| [FileDataStore.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileDataStore.ts)                                                                                                                                                                         | Data stays in Rust |
-| `CHUNK_SIZE`, chunking logic                                                                                                                                                                                                                                                                                                   | Fetch on demand    |
-| [listDirectoryNextChunk](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/tauri-commands.ts#25-33)                                                                                                                                                                          | Not needed         |
-| `loadingMore` state                                                                                                                                                                                                                                                                                                            | Not needed         |
-| [appendFiles()](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileDataStore.ts#154-161), [mergeExtendedData()](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileDataStore.ts#208-239) | Not needed         |
+| Removed                                                   | Reason             |
+| --------------------------------------------------------- | ------------------ |
+| FileDataStore.ts                                          | Data stays in Rust |
+| `CHUNK_SIZE`, chunking logic                              | Fetch on demand    |
+| listDirectoryNextChunk                                    | Not needed         |
+| `loadingMore` state                                       | Not needed         |
+| appendFiles() and mergeExtendedData() in FileDataStore.ts | Not needed         |
 
 ---
 

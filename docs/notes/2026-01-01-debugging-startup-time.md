@@ -105,12 +105,6 @@ Possible causes to investigate:
 4. macOS power management throttling
 5. Spotlight/mdworker indexing affecting file access
 
-## User's system context
-
-- The project is in Dropbox folder (but Dropbox is quit)
-- Path: `/Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander`
-- Other apps work fine, only Tauri/WKWebView affected
-
 ## Files modified for debugging
 
 1. `src/routes/+page.svelte` - Added timing logs

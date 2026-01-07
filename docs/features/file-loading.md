@@ -48,9 +48,7 @@ sequenceDiagram
 
 ### 1. Frontend: FilePane.svelte
 
-The
-[FilePane](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FilePane.svelte)
-component orchestrates directory loading.
+The [FilePane](../../src/lib/file-explorer/FilePane.svelte) component orchestrates directory loading.
 
 **Key function:** `loadDirectory(path, selectName?)`
 
@@ -66,9 +64,7 @@ avoid the overhead of making 50k objects reactive. A simple counter (`filesVersi
 
 ### 2. IPC layer: tauri-commands.ts
 
-The
-[tauri-commands](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/tauri-commands.ts)
-module provides typed wrappers for Rust commands.
+The [tauri-commands](../../src/lib/tauri-commands.ts) module provides typed wrappers for Rust commands.
 
 **Session API functions:**
 
@@ -76,14 +72,12 @@ module provides typed wrappers for Rust commands.
 - `listDirectoryNextChunk(sessionId, chunkSize)` → `ChunkNextResult`
 - `listDirectoryEndSession(sessionId)` → void
 
-For serialization format rationale, see
-[ADR 007: Use JSON for Tauri IPC](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/docs/adr/007-json-for-ipc.md).
+For serialization format rationale, see [ADR 007: Use JSON for Tauri IPC](../adr/007-json-for-ipc.md).
 
 ### 3. Rust commands: commands/file_system.rs
 
-The
-[file_system commands](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src-tauri/src/commands/file_system.rs)
-expose Tauri commands that call the file system operations.
+The [file_system commands](../../src-tauri/src/commands/file_system.rs) expose Tauri commands that call the file system
+operations.
 
 **Commands:**
 
@@ -93,9 +87,7 @@ expose Tauri commands that call the file system operations.
 
 ### 4. File system operations: file_system/operations.rs
 
-The
-[operations module](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src-tauri/src/file_system/operations.rs)
-contains the core logic.
+The [operations module](../../src-tauri/src/file_system/operations.rs) contains the core logic.
 
 **Session cache:** A static `HashMap<String, CachedDirectory>` stores directory listings keyed by session ID. Sessions
 expire after 60 seconds to prevent memory leaks.
@@ -133,19 +125,18 @@ This balances:
 
 ## Key design decisions
 
-1. **JSON over MessagePack** - Native JSON is faster through Tauri's IPC. See
-   [ADR 007](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/docs/adr/007-json-for-ipc.md).
+1. **JSON over MessagePack**: Native JSON is faster through Tauri's IPC. See [ADR 007](../adr/007-json-for-ipc.md)
 
-2. **Session-based caching** - Directory is read once, chunks served from memory. Avoids O(n²) re-reading.
+2. **Session-based caching**: Directory is read once, chunks served from memory. Avoids O(n²) re-reading.
 
-3. **Non-reactive file array** - Svelte's `$state` on 50k objects caused ~9.5s overhead. Using a plain array with manual
-   reactivity trigger reduced this to ~50ms.
+3. **Non-reactive file array**: Svelte's `$state` on 50k objects caused ~9.5 sec overhead. Using a plain array with
+   manual reactivity trigger reduced this to ~50ms.
 
-4. **Progressive rendering** - First chunk appears in ~350ms. Remaining chunks load without blocking the UI.
+4. **Progressive rendering**: First chunk appears in ~350ms. Remaining chunks load without blocking the UI.
 
 ## Future improvements
 
-- **Virtual scrolling** - Only render visible rows (phase 4)
-- **Lazy metadata loading** - Load only names first, fetch metadata on demand
-- **File system watcher** - Auto-refresh on external changes
-- **Cancellation** - Cancel in-progress directory reads when navigating away
+- **Virtual scrolling**: Only render visible rows (phase 4)
+- **Lazy metadata loading**: Load only names first, fetch metadata on demand
+- **File system watcher**: Auto-refresh on external changes
+- **Cancellation**: Cancel in-progress directory reads when navigating away

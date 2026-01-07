@@ -23,6 +23,10 @@ use smb_rpc as _;
 #[cfg(target_os = "macos")]
 use chrono as _;
 //noinspection ALL
+// MCP Bridge is only used in debug builds, so silence the warning in release builds
+#[cfg(not(debug_assertions))]
+use tauri_plugin_mcp_bridge as _;
+//noinspection ALL
 // security_framework is used in network/keychain.rs for Keychain integration
 #[cfg(target_os = "macos")]
 use security_framework as _;

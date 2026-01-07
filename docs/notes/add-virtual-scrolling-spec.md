@@ -9,12 +9,11 @@ are rendered as DOM elements which becomes slow with large directories.
 
 ### Files to modify
 
-- [src/lib/file-explorer/FileList.svelte](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileList.svelte) -
-  Main target, needs virtual scrolling
-- [src/lib/file-explorer/FilePane.svelte](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FilePane.svelte) -
-  May need updates for scroll position management
-- [src/lib/file-explorer/apply-diff.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts) -
-  Already handles cursor preservation, likely no changes needed
+- src/lib/file-explorer/FileList.svelte - Main target, needs virtual scrolling
+- [src/lib/file-explorer/FilePane.svelte](../../src/lib/file-explorer/FilePane.svelte) - May need updates for scroll
+  position management
+- [src/lib/file-explorer/apply-diff.ts](../../src/lib/file-explorer/apply-diff.ts) - Already handles cursor
+  preservation, likely no changes needed
 
 ### Current FileList.svelte structure
 
@@ -47,18 +46,15 @@ FilePane.svelte
 
 ### Key concern: Diffs during partial render
 
-When file watching emits a diff (add/remove/modify),
-[applyDiff()](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts#6-67)
-in
-[apply-diff.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts)
-modifies `allFilesRaw` and returns the new cursor index. The virtual scroller must handle:
+When file watching emits a diff (add/remove/modify), [applyDiff()](../../src/lib/file-explorer/apply-diff.ts) in
+[apply-diff.ts](../../src/lib/file-explorer/apply-diff.ts) modifies `allFilesRaw` and returns the new cursor index. The
+virtual scroller must handle:
 
 1. **Added files** - May be inserted anywhere in the list (sorted insertion)
 2. **Removed files** - May be in visible area, before visible area, or after
 3. **Modified files** - Same position, just data change
-4. **Cursor preservation** - Already handled by
-   [applyDiff()](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts#6-67)
-   which finds selected file by path
+4. **Cursor preservation** - Already handled by [applyDiff()](../../src/lib/file-explorer/apply-diff.ts) which finds
+   selected file by path
 
 ### Race condition: Diff arrives during scroll
 
@@ -68,9 +64,8 @@ If user is scrolling and a diff arrives:
 - Virtual scroll calculations (startIndex, endIndex) may become stale
 - Must recalculate visible window
 
-**Recommendation:** After
-[applyDiff()](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts#6-67),
-bump `filesVersion` (already done) which should trigger recalculation.
+**Recommendation:** After [applyDiff()](../../src/lib/file-explorer/apply-diff.ts), bump `filesVersion` (already done)
+which should trigger recalculation.
 
 ### Edge case: Diff during chunked loading
 
@@ -176,9 +171,7 @@ export function scrollToIndex(index: number) {
 
 - Virtual window calculation with different list sizes
 - `scrollToIndex` behavior (above viewport, below viewport, already visible)
-- Interaction with
-  [applyDiff](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts#6-67) -
-  cursor should stay visible after diff
+- Interaction with [applyDiff](../../src/lib/file-explorer/apply-diff.ts) - cursor should stay visible after diff
 
 ### Manual tests
 
@@ -211,14 +204,10 @@ export function scrollToIndex(index: number) {
 
 ## Files to reference
 
-- [src/lib/file-explorer/FileList.svelte](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FileList.svelte) -
-  Current implementation
-- [src/lib/file-explorer/FilePane.svelte](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/FilePane.svelte) -
-  Parent component
-- [src/lib/file-explorer/apply-diff.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/apply-diff.ts) -
-  Cursor preservation logic
-- [src/lib/file-explorer/types.ts](file:///Users/veszelovszki/Library/CloudStorage/Dropbox/projects-git/vdavid/rusty-commander/src/lib/file-explorer/types.ts) -
-  FileEntry type
+- src/lib/file-explorer/FileList.svelte - Current implementation
+- [src/lib/file-explorer/FilePane.svelte](../../src/lib/file-explorer/FilePane.svelte) - Parent component
+- [src/lib/file-explorer/apply-diff.ts](../../src/lib/file-explorer/apply-diff.ts) - Cursor preservation logic
+- [src/lib/file-explorer/types.ts](../../src/lib/file-explorer/types.ts) - FileEntry type
 
 ## Commands
 
