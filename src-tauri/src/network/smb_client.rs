@@ -3,7 +3,7 @@
 //! Uses the `smb` crate (smb-rs) to list shares on network hosts.
 //! Implements connection pooling, caching, and authentication handling.
 
-use log::debug;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use smb::{Client, ClientConfig};
 use smb_rpc::interface::ShareInfo1;
@@ -278,24 +278,35 @@ async fn list_shares_smb_rs(
                     Ok(_) | Err(_) => {
                         // smb-rs returned 0 shares or failed - fall back to smbutil with auth
                         // This handles cases where smb-rs internally falls back to guest
-                        debug!("smb-rs auth returned empty or failed, trying smbutil with credentials");
+                        info!("smb-rs auth returned empty or failed, trying smbutil with credentials");
                         match list_shares_smbutil_with_auth(hostname, ip_address, port, user, pass).await {
                             Ok(result) => {
-                                debug!("smbutil with auth succeeded, got {} shares", result.shares.len());
+                                info!("smbutil with auth succeeded, got {} shares", result.shares.len());
                                 return Ok(result);
                             }
                             Err(e) => {
-                                debug!("smbutil with auth also failed: {:?}", e);
+                                info!("smbutil with auth also failed: {:?}", e);
                                 return Err(e);
                             }
                         }
                     }
                 }
             } else {
-                debug!("No credentials provided, returning AuthRequired");
-                return Err(ShareListError::AuthRequired(
-                    "This server requires authentication to list shares".to_string(),
-                ));
+                // No explicit credentials provided - try smbutil which uses macOS Keychain
+                // This allows seamless login when user has previously connected via Finder
+                info!("No explicit credentials, trying smbutil with Keychain...");
+                match list_shares_smbutil_authenticated_from_keychain(hostname, ip_address, port).await {
+                    Ok(result) => {
+                        info!("smbutil with Keychain succeeded, got {} shares", result.shares.len());
+                        return Ok(result);
+                    }
+                    Err(e) => {
+                        info!("smbutil with Keychain failed: {:?}, requiring manual login", e);
+                        return Err(ShareListError::AuthRequired(
+                            "This server requires authentication to list shares".to_string(),
+                        ));
+                    }
+                }
             }
         }
         Err(e) => {
@@ -377,6 +388,83 @@ async fn list_shares_smbutil(
     })
 }
 
+/// Lists shares using macOS Keychain credentials via smbutil.
+/// This runs smbutil WITHOUT explicit credentials, allowing it to use
+/// credentials stored in macOS Keychain (e.g., from previous Finder connections).
+/// No -G (guest) flag, so smbutil will try to authenticate using Keychain.
+#[cfg(target_os = "macos")]
+async fn list_shares_smbutil_authenticated_from_keychain(
+    hostname: &str,
+    ip_address: Option<&str>,
+    port: u16,
+) -> Result<ShareListResult, ShareListError> {
+    use std::process::Command;
+
+    // Build the SMB URL: //host:port or //ip:port
+    let host = ip_address.unwrap_or(hostname);
+    let url = if port == 445 {
+        format!("//{}", host)
+    } else {
+        format!("//{}:{}", host, port)
+    };
+
+    info!("Running smbutil view -N {} (using Keychain)", url);
+
+    // Run smbutil without -G (guest) flag, but with -N (no prompt)
+    // This allows smbutil to use stored Keychain credentials
+    let output = tokio::task::spawn_blocking(move || Command::new("smbutil").args(["view", "-N", &url]).output())
+        .await
+        .map_err(|e| ShareListError::ProtocolError(format!("Failed to spawn smbutil: {}", e)))?
+        .map_err(|e| ShareListError::ProtocolError(format!("Failed to run smbutil: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        debug!(
+            "smbutil with Keychain failed: exit={:?}, stderr={}, stdout={}",
+            output.status.code(),
+            stderr,
+            stdout
+        );
+
+        if stderr.contains("Authentication error") || stderr.contains("rejected the authentication") {
+            return Err(ShareListError::AuthRequired("Keychain credentials invalid or missing".to_string()));
+        }
+        return Err(ShareListError::AuthRequired(format!(
+            "No valid Keychain credentials: {}",
+            stderr.trim()
+        )));
+    }
+
+    // Parse smbutil output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let shares = parse_smbutil_output(&stdout);
+
+    if shares.is_empty() {
+        return Err(ShareListError::AuthRequired("Keychain auth returned no shares".to_string()));
+    }
+
+    info!("smbutil with Keychain auth succeeded, got {} shares", shares.len());
+
+    Ok(ShareListResult {
+        shares,
+        auth_mode: AuthMode::CredsRequired, // User is authenticated via Keychain
+        from_cache: false,
+    })
+}
+
+/// Fallback for non-macOS platforms - smbutil Keychain auth is not available.
+#[cfg(not(target_os = "macos"))]
+async fn list_shares_smbutil_authenticated_from_keychain(
+    _hostname: &str,
+    _ip_address: Option<&str>,
+    _port: u16,
+) -> Result<ShareListResult, ShareListError> {
+    Err(ShareListError::AuthRequired(
+        "Keychain authentication not available on this platform".to_string(),
+    ))
+}
+
 /// Lists shares using macOS smbutil command WITH credentials.
 /// This is used when smb-rs authentication fails but we have credentials.
 #[cfg(target_os = "macos")]
@@ -407,10 +495,11 @@ async fn list_shares_smbutil_with_auth(
     } else {
         format!("//{}:***@{}:{}", username, host, port)
     };
-    debug!("Running smbutil view {}", safe_url);
+    info!("Running smbutil view -N {}", safe_url);
 
-    // Run smbutil with credentials in URL (no -G flag for guest)
-    let output = tokio::task::spawn_blocking(move || Command::new("smbutil").args(["view", &url]).output())
+    // Run smbutil with credentials in URL
+    // -N: Don't prompt for password or use Keychain - only use credentials in URL
+    let output = tokio::task::spawn_blocking(move || Command::new("smbutil").args(["view", "-N", &url]).output())
         .await
         .map_err(|e| ShareListError::ProtocolError(format!("Failed to spawn smbutil: {}", e)))?
         .map_err(|e| ShareListError::ProtocolError(format!("Failed to run smbutil: {}", e)))?;
