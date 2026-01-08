@@ -1,0 +1,53 @@
+name: Slow checks
+
+# Daily security and dependency checks
+# Runs at 4 AM CET (3 AM UTC) to catch newly disclosed vulnerabilities
+# GitHub automatically emails repo admins on failure
+on:
+    schedule:
+        - cron: '0 3 * * *' # 4 AM CET = 3 AM UTC
+    workflow_dispatch: # Allow manual trigger
+
+jobs:
+    dependency-checks:
+        name: Dependency checks
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install mise
+              uses: jdx/mise-action@v2
+
+            - name: Install tools with mise
+              run: mise install
+
+            - name: Cache Cargo
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/registry/cache
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-
+
+            - name: Install Tauri dependencies (Linux)
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+            - name: Build check tool
+              run: go build -o check .
+              working-directory: ./scripts/check
+
+            - name: Run cargo-audit
+              run: ./scripts/check/check --check cargo-audit --ci
+
+            - name: Run cargo-deny
+              run: ./scripts/check/check --check cargo-deny --ci
+
+            - name: Install nightly toolchain (for cargo-udeps)
+              run: rustup toolchain install nightly
+
+            - name: Run cargo-udeps
+              run: ./scripts/check/check --check cargo-udeps --ci
