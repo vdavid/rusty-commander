@@ -1,5 +1,5 @@
 {
-    "name": "cmdr",
+    "name": "@cmdr/desktop",
     "version": "0.2.0",
     "description": "",
     "type": "module",

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -20,7 +21,7 @@ func (c *PrettierCheck) Run(ctx *CheckContext) error {
 	} else {
 		cmd = exec.Command("pnpm", "format")
 	}
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
@@ -47,7 +48,7 @@ func (c *ESLintCheck) Run(ctx *CheckContext) error {
 	} else {
 		cmd = exec.Command("pnpm", "lint:fix")
 	}
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
@@ -74,7 +75,7 @@ func (c *StylelintCheck) Run(ctx *CheckContext) error {
 	} else {
 		cmd = exec.Command("pnpm", "stylelint:fix")
 	}
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
@@ -96,7 +97,7 @@ func (c *SvelteCheck) Name() string {
 
 func (c *SvelteCheck) Run(ctx *CheckContext) error {
 	cmd := exec.Command("pnpm", "check")
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	// svelte-check returns 0 even with warnings, so check output for warnings
 	if err != nil {
@@ -122,7 +123,7 @@ func (c *KnipCheck) Name() string {
 
 func (c *KnipCheck) Run(ctx *CheckContext) error {
 	cmd := exec.Command("pnpm", "knip")
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
@@ -141,7 +142,7 @@ func (c *SvelteTestsCheck) Name() string {
 
 func (c *SvelteTestsCheck) Run(ctx *CheckContext) error {
 	cmd := exec.Command("pnpm", "test")
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()
@@ -160,7 +161,7 @@ func (c *E2ETestsCheck) Name() string {
 
 func (c *E2ETestsCheck) Run(ctx *CheckContext) error {
 	cmd := exec.Command("pnpm", "test:e2e")
-	cmd.Dir = ctx.RootDir
+	cmd.Dir = filepath.Join(ctx.RootDir, "apps", "desktop")
 	output, err := runCommand(cmd, true)
 	if err != nil {
 		fmt.Println()

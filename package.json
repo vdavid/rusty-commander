@@ -1,0 +1,9 @@
+{
+    "name": "cmdr",
+    "private": true,
+    "scripts": {
+        "dev": "pnpm --filter @cmdr/desktop tauri dev",
+        "build": "pnpm --filter @cmdr/desktop tauri build",
+        "check": "./scripts/check.sh"
+    }
+}

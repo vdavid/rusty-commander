@@ -5,30 +5,34 @@ This is Cmdr, a blazing a fast, keyboard-driven, two-pane file manager built wit
 
 Uses Rust, Tauri 2, Svelte 5, TypeScript, Tailwind 4. Targets macOS now, Win and Linux later.
 
-- Dev server: `pnpm tauri dev` (launches Svelte + Rust with hot reload)
-- Prod build: `pnpm tauri build`
+- Dev server: `pnpm dev` from repo root (or `pnpm tauri dev` from `apps/desktop/`)
+- Prod build: `pnpm build` from repo root (or `pnpm tauri build` from `apps/desktop/`)
 
 ## Architecture
 
-- `/src-tauri/` - Rust/Tauri backend (lib + binary)
-    - `Cargo.toml` - Dependencies: tauri v2, serde, notify (file watching), tokio
-    - `deny.toml` - License and dependency policies (advisories disabled due to Tauri's transitive deps)
-    - `clippy.toml` - Cognitive complexity threshold: 15
-    - `rustfmt.toml` - Max width: 120, 4 spaces
-- `/src/` - Svelte frontend
-    - Uses SvelteKit with static adapter
-    - TypeScript strict mode enabled
-    - Tailwind CSS v4 for styling
+This is a monorepo with the following structure:
+
+- `/apps/desktop/` - The Tauri desktop app
+    - `src-tauri/` - Rust/Tauri backend (lib + binary)
+        - `Cargo.toml` - Dependencies: tauri v2, serde, notify (file watching), tokio
+        - `deny.toml` - License and dependency policies (advisories disabled due to Tauri's transitive deps)
+        - `clippy.toml` - Cognitive complexity threshold: 15
+        - `rustfmt.toml` - Max width: 120, 4 spaces
+    - `src/` - Svelte frontend
+        - Uses SvelteKit with static adapter
+        - TypeScript strict mode enabled
+        - Tailwind CSS v4 for styling
+    - `e2e/` - Playwright end-to-end tests
+    - `test/` - Vitest unit tests
 - `/scripts/check/` - Go-based unified check runner (replaces individual scripts)
-- `/e2e/` - Playwright end-to-end tests
 - `/docs/` - Docs including `style-guide.md`
 
 ### Guidelines
 
-- **Frontend components**: We keep them in `src/lib/` (SvelteKit convention)
-- **Routes**: In `src/routes/` (SvelteKit file-based routing)
-- **Rust modules**: We keep them in `src-tauri/src/`
-- **Static assets**: In `/static/`
+- **Frontend components**: We keep them in `apps/desktop/src/lib/` (SvelteKit convention)
+- **Routes**: In `apps/desktop/src/routes/` (SvelteKit file-based routing)
+- **Rust modules**: We keep them in `apps/desktop/src-tauri/src/`
+- **Static assets**: In `apps/desktop/static/`
 
 ## Common tasks
 
@@ -40,12 +44,12 @@ Uses Rust, Tauri 2, Svelte 5, TypeScript, Tailwind 4. Targets macOS now, Win and
   from defaults.
 - Generating test data: see [here](docs/workflows/generating-test-files.md) - Creates folders with 1k-50k files for
   stress-testing.
-- Running a specific Rust test: `cd src-tauri && cargo nextest run <test_name>`.
-- Running a specific Svelte test: `pnpm vitest run -t "<test_name>"`
-- Running a specific E2E test: `pnpm test:e2e --grep "<test_name>"` or `pnpm test:e2e <test-file>`
+- Running a specific Rust test: `cd apps/desktop/src-tauri && cargo nextest run <test_name>`.
+- Running a specific Svelte test: `cd apps/desktop && pnpm vitest run -t "<test_name>"`
+- Running a specific E2E test: `cd apps/desktop && pnpm test:e2e --grep "<test_name>"` or `pnpm test:e2e <test-file>`
 - Debugging front end: Open dev console in running app (`Cmd+Option+I` on macOS). Use temp `console.log`s as needed.
 - Debugging Rust: Use `println!` or `dbg!` macros
-- Regenerating the icon: `cargo tauri icon ./path/to/your-high-res-icon.png` (in project root)
+- Regenerating the icon: `cd apps/desktop && cargo tauri icon ./path/to/your-high-res-icon.png`
 - Adding a new library: NEVER rely on your training data! ALWAYS use npm/ncu, or another source to find the latest
   versions of libraries. Check out their GitHub, too, and see if they are active. Check Google/Reddit for the latest
   best solutions!
@@ -64,9 +68,9 @@ Can use also `./scripts/check.sh --rust`, `./scripts/check.sh --svelte`, `./scri
 or `./scripts/check.sh --help` to see all options.
 
 Can also use `cargo fmt`, `cargo clippy`, `cargo audit`, `cargo deny check`, `cargo nextest run`, `pnpm format`,
-`pnpm lint --fix`, `pnpm stylelint:fix`, `pnpm test`, `pnpm test:e2e` as needed.
+`pnpm lint --fix`, `pnpm stylelint:fix`, `pnpm test`, `pnpm test:e2e` as needed (from the `apps/desktop/` directory).
 
-**CSS health checks**: When writing CSS, ALWAYS use variables defined in `src/app.css`. Stylelint catches
+**CSS health checks**: When writing CSS, ALWAYS use variables defined in `apps/desktop/src/app.css`. Stylelint catches
 undefined/hallucinated CSS variables.
 
 GitHub Actions workflow in `.github/workflows/ci.yml`:

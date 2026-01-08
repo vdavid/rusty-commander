@@ -674,7 +674,7 @@ impl Volume for InMemoryVolume {
 **Steps**:
 
 1. Create `list_directory_start_with_volume`:
-    ```rust
+    ```
     pub(crate) fn list_directory_start_with_volume(
         volume: &dyn Volume,
         path: &Path,
@@ -778,7 +778,7 @@ from the cache?
     static VOLUME_MANAGER: LazyLock<VolumeManager> = LazyLock::new(VolumeManager::new);
     ```
 2. In app setup, register the root volume:
-    ```rust
+    ```
     let root_volume = Arc::new(LocalPosixVolume::new("Macintosh HD", "/"));
     VOLUME_MANAGER.register("root", root_volume);
     VOLUME_MANAGER.set_default("root");
@@ -928,7 +928,7 @@ from the cache?
 4. Test file operations (if any are implemented)
 5. Test that watcher still works
 6. Test hidden files toggle
-7. Test large directories (use the 10k file test folder)
+7. Test large directories (use the 10k-file test folder)
 
 **Acceptance criteria**:
 

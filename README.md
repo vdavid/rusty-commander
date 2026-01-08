@@ -9,7 +9,7 @@ Commander and Total Commander.
 
 ## Overview
 
-<img alt="Cmdr logo" src="./src-tauri/icons/128x128.png" width="128" height="128" style="display:block; margin:0 auto;" />
+<img alt="Cmdr logo" src="./apps/desktop/src-tauri/icons/128x128.png" width="128" height="128" style="display:block; margin:0 auto;" />
 
 Cmdr is a desktop file manager that brings back the classic two-pane layout. It's built for speed and keyboard
 navigation. If you've ever used Norton Commander, Midnight Commander, or Total Commander, you'll feel right at home.

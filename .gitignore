@@ -16,13 +16,13 @@ _ignored/
 .env.*
 !.env.example
 
-# Node modules
-node_modules
+# Node modules (monorepo-wide)
+node_modules/
 
 # SvelteKit build files
 .svelte-kit/
 
-# Tauri build files
+# Tauri/Vite build files
 build/
 
 # Go build files
@@ -31,3 +31,6 @@ scripts/check/check
 # Test results
 playwright-report/
 test-results/
+
+# Rust build artifacts
+target/

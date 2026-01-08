@@ -395,6 +395,7 @@
         color: var(--color-text-muted);
         padding: 8px 12px 4px;
         text-transform: uppercase;
+        /*noinspection CssNonIntegerLengthInPixels*/
         letter-spacing: 0.5px;
     }
 

@@ -11,12 +11,12 @@ is managed separately by `rustup`. This version is tested with Rust 1.92.0.
 1. Install mise: `brew install mise` (see [alternatives](https://mise.jdx.dev/getting-started.html))
 2. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 3. Run `mise install` to set up Node, pnpm, and Go
-4. Run `pnpm install` to install frontend dependencies
+4. Run `cd apps/desktop && pnpm install` to install frontend dependencies
 
 ## Running the app
 
 ```bash
-pnpm tauri dev
+pnpm dev
 ```
 
 This starts both the Svelte frontend and the Rust backend with hot reload.
@@ -31,11 +31,13 @@ Run all checks before committing with `./scripts/check.sh`. And here is a more c
 ./scripts/check.sh --svelte       # to run Svelte checks
 ./scripts/check.sh --check clippy # to run specific checks
 ./scripts/check.sh --help`        # for more options.
-# Alternatively, some specific checks, but these are rarely needed:
+# Alternatively, some specific checks (run from apps/desktop/), but these are rarely needed:
+cd apps/desktop/src-tauri
 cargo fmt                         # to format Rust code
 cargo clippy                      # to lint Rust code
 cargo audit                       # to check Rust dependencies for security vulnerabilities
 cargo test                        # to run Rust tests
+cd apps/desktop
 pnpm format                       # to format frontend code
 pnpm lint --fix                   # to lint frontend code
 pnpm test                         # to run frontend tests
@@ -43,17 +45,26 @@ pnpm test                         # to run frontend tests
 
 ## Building
 
+From repo root:
+
 ```bash
+pnpm build
+```
+
+Or from the desktop app directory:
+
+```bash
+cd apps/desktop
 pnpm tauri build
 ```
 
-This creates a production build for your current platform in `src-tauri/target/release/`.
+This creates a production build for your current platform in `apps/desktop/src-tauri/target/release/`.
 
 For an universal installer:
 
 - `rustup target add x86_64-apple-darwin` once
-- Then `pnpm tauri build --target universal-apple-darwin` each time.
-- Then the binary is at `src-tauri/target/universal-apple-darwin/release/bundle/dmg/Cmdr_0.1.0_universal.dmg`
+- Then `cd apps/desktop && pnpm tauri build --target universal-apple-darwin` each time.
+- Then the binary is at `apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/Cmdr_0.1.0_universal.dmg`
 
 ## Agent integration (MCP)
 

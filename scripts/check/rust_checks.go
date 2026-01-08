@@ -15,7 +15,7 @@ func (c *RustfmtCheck) Name() string {
 }
 
 func (c *RustfmtCheck) Run(ctx *CheckContext) error {
-	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
+	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 	var cmd *exec.Cmd
 	if ctx.CI {
 		cmd = exec.Command("cargo", "fmt", "--check")
@@ -43,7 +43,7 @@ func (c *ClippyCheck) Name() string {
 }
 
 func (c *ClippyCheck) Run(ctx *CheckContext) error {
-	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
+	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 	var cmd *exec.Cmd
 	if ctx.CI {
 		cmd = exec.Command("cargo", "clippy", "--", "-D", "warnings")
@@ -71,7 +71,7 @@ func (c *CargoAuditCheck) Name() string {
 }
 
 func (c *CargoAuditCheck) Run(ctx *CheckContext) error {
-	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
+	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 
 	// Check if cargo-audit is installed
 	if !commandExists("cargo-audit") {
@@ -105,7 +105,7 @@ func (c *CargoDenyCheck) Name() string {
 }
 
 func (c *CargoDenyCheck) Run(ctx *CheckContext) error {
-	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
+	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 
 	// Check if deny.toml exists
 	denyToml := filepath.Join(rustDir, "deny.toml")
@@ -143,7 +143,7 @@ func (c *RustTestsCheck) Name() string {
 }
 
 func (c *RustTestsCheck) Run(ctx *CheckContext) error {
-	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
+	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 
 	// Check if cargo-nextest is installed
 	if !commandExists("cargo-nextest") {
@@ -173,7 +173,7 @@ func (c *CargoUdepsCheck) Name() string {
 }
 
 func (c *CargoUdepsCheck) Run(ctx *CheckContext) error {
-	rustDir := filepath.Join(ctx.RootDir, "src-tauri")
+	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 
 	// Check if cargo-udeps is installed
 	if !commandExists("cargo-udeps") {
