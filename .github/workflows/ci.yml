@@ -141,3 +141,51 @@ jobs:
 
             - name: Run E2E tests
               run: ./scripts/check/check --check e2e-tests --ci
+
+    website-checks:
+        name: Website
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install mise
+              uses: jdx/mise-action@v2
+
+            - name: Install tools with mise
+              run: mise install
+
+            - name: Cache pnpm
+              uses: actions/cache@v4
+              with:
+                  path: ~/.pnpm-store
+                  key: ${{ runner.os }}-pnpm-website-${{ hashFiles('apps/website/pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-website-
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+              working-directory: ./apps/website
+
+            - name: Build website
+              run: pnpm build
+              working-directory: ./apps/website
+
+            - name: Run Playwright tests
+              run: pnpm test:e2e
+              working-directory: ./apps/website
+
+            - name: Run Lighthouse CI
+              run: pnpm test:lighthouse
+              working-directory: ./apps/website
+              env:
+                  LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+            - name: Upload Lighthouse report
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: lighthouse-report
+                  path: apps/website/.lighthouseci/
+                  retention-days: 7

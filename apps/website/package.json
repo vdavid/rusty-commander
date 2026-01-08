@@ -12,7 +12,9 @@
         "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "typecheck": "astro check"
+        "typecheck": "astro check",
+        "test:e2e": "playwright test",
+        "test:lighthouse": "lhci autorun"
     },
     "dependencies": {
         "@tailwindcss/vite": "^4.1.18",
@@ -22,6 +24,8 @@
     "devDependencies": {
         "@astrojs/check": "^0.9.6",
         "@eslint/js": "^9.39.2",
+        "@lhci/cli": "^0.14.0",
+        "@playwright/test": "^1.52.0",
         "eslint": "^9.39.2",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-astro": "^1.5.0",

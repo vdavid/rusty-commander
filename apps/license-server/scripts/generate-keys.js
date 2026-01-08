@@ -11,7 +11,7 @@ import { writeFileSync, mkdirSync } from 'fs'
 
 async function main() {
     // Generate key pair
-    const privateKey = ed.utils.randomPrivateKey()
+    const privateKey = ed.utils.randomSecretKey()
     const publicKey = await ed.getPublicKeyAsync(privateKey)
 
     // Convert to hex strings
