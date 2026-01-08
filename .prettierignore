@@ -1,0 +1,22 @@
+# Root-level ignores for Prettier
+# Note: Prettier doesn't walk up to find .prettierignore when run from subdirs,
+# so each app may need its own .prettierignore for app-specific patterns.
+
+# Dependencies
+node_modules/
+
+# Build outputs
+**/dist/
+**/build/
+**/.svelte-kit/
+**/.astro/
+
+# Rust
+**/target/
+**/src-tauri/
+
+# Lock files
+pnpm-lock.yaml
+
+# Generated
+**/*.generated.*

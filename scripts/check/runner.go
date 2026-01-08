@@ -12,18 +12,28 @@ func showUsage() {
 	fmt.Println("Run code quality checks for the Cmdr project.")
 	fmt.Println()
 	fmt.Println("OPTIONS:")
-	fmt.Println("    --rust, --rust-only      Run only Rust checks")
-	fmt.Println("    --svelte, --svelte-only  Run only Svelte checks")
+	fmt.Println("    --app NAME               Run checks for a specific app (desktop, website, license-server)")
+	fmt.Println("    --rust, --rust-only      Run only Rust checks (desktop)")
+	fmt.Println("    --svelte, --svelte-only  Run only Svelte checks (desktop)")
 	fmt.Println("    --check NAME             Run a single check by name")
 	fmt.Println("    --ci                     Disable auto-fixing (for CI)")
 	fmt.Println("    --verbose                Show detailed output")
 	fmt.Println("    -h, --help               Show this help message")
 	fmt.Println()
-	fmt.Println("If no options are provided, runs all checks (Rust and Svelte).")
+	fmt.Println("If no options are provided, runs all checks for all apps.")
+	fmt.Println()
+	fmt.Println("EXAMPLES:")
+	fmt.Println("    go run ./scripts/check                  # Run all checks")
+	fmt.Println("    go run ./scripts/check --app desktop    # Run only desktop app checks")
+	fmt.Println("    go run ./scripts/check --app website    # Run only website checks")
+	fmt.Println("    go run ./scripts/check --check eslint   # Run only ESLint")
+	fmt.Println("    go run ./scripts/check --ci             # CI mode (no auto-fix)")
 	fmt.Println()
 	fmt.Println("Available check names:")
-	fmt.Println("  Rust: rustfmt, clippy, cargo-audit, cargo-deny, rust-tests")
-	fmt.Println("  Svelte: prettier, eslint, svelte-tests, e2e-tests")
+	fmt.Println("  Desktop/Rust: rustfmt, clippy, cargo-audit, cargo-deny, rust-tests")
+	fmt.Println("  Desktop/Svelte: prettier, eslint, stylelint, svelte-check, knip, svelte-tests, e2e-tests")
+	fmt.Println("  Website: website-prettier, website-eslint, website-typecheck, website-build")
+	fmt.Println("  License server: license-server-prettier, license-server-eslint, license-server-typecheck, license-server-tests")
 	fmt.Println()
 	fmt.Println("Each check displays its execution time in the format: OK (123ms) or FAILED (1.23s)")
 }
@@ -47,33 +57,37 @@ func runCheck(check Check, ctx *CheckContext) error {
 
 // runRustChecks runs all Rust checks.
 func runRustChecks(ctx *CheckContext) (bool, []string) {
-	fmt.Println("🦀 Rust checks...")
+	fmt.Println("🦀 Rust checks (desktop)...")
 	checks := getRustChecks()
-	var failed bool
-	var failedChecks []string
-	for _, check := range checks {
-		fmt.Printf("  • %s... ", check.Name())
-		start := time.Now()
-		err := check.Run(ctx)
-		duration := time.Since(start)
-
-		if err != nil {
-			fmt.Printf("%sFAILED%s (%s)\n", colorRed, colorReset, formatDuration(duration))
-			fmt.Printf("      Error: %v\n", err)
-			failed = true
-			failedChecks = append(failedChecks, getCheckCLIName(check))
-		} else {
-			fmt.Printf("%sOK%s (%s)\n", colorGreen, colorReset, formatDuration(duration))
-		}
-	}
-	return failed, failedChecks
+	return runChecks(checks, ctx)
 }
 
 // runSvelteChecks runs all Svelte checks.
 func runSvelteChecks(ctx *CheckContext) (bool, []string) {
 	fmt.Println()
-	fmt.Println("🎨 Svelte checks...")
+	fmt.Println("🎨 Svelte checks (desktop)...")
 	checks := getSvelteChecks()
+	return runChecks(checks, ctx)
+}
+
+// runWebsiteChecks runs all website checks.
+func runWebsiteChecks(ctx *CheckContext) (bool, []string) {
+	fmt.Println()
+	fmt.Println("🌐 Website checks...")
+	checks := getWebsiteChecks()
+	return runChecks(checks, ctx)
+}
+
+// runLicenseServerChecks runs all license server checks.
+func runLicenseServerChecks(ctx *CheckContext) (bool, []string) {
+	fmt.Println()
+	fmt.Println("🔑 License server checks...")
+	checks := getLicenseServerChecks()
+	return runChecks(checks, ctx)
+}
+
+// runChecks runs a list of checks and returns failure status and failed check names.
+func runChecks(checks []Check, ctx *CheckContext) (bool, []string) {
 	var failed bool
 	var failedChecks []string
 	for _, check := range checks {

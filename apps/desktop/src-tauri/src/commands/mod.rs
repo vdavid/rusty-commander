@@ -3,6 +3,7 @@
 pub mod file_system;
 pub mod font_metrics;
 pub mod icons;
+pub mod licensing;
 #[cfg(target_os = "macos")]
 pub mod network;
 #[cfg(target_os = "macos")]

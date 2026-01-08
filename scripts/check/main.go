@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -11,8 +12,9 @@ func main() {
 	var (
 		rustOnly    = flag.Bool("rust", false, "Run only Rust checks")
 		rustOnly2   = flag.Bool("rust-only", false, "Run only Rust checks")
-		svelteOnly  = flag.Bool("svelte", false, "Run only Svelte checks")
-		svelteOnly2 = flag.Bool("svelte-only", false, "Run only Svelte checks")
+		svelteOnly  = flag.Bool("svelte", false, "Run only Svelte/desktop checks")
+		svelteOnly2 = flag.Bool("svelte-only", false, "Run only Svelte/desktop checks")
+		appName     = flag.String("app", "", "Run checks for a specific app (desktop, website, license-server)")
 		checkName   = flag.String("check", "", "Run a single check by name")
 		ciMode      = flag.Bool("ci", false, "Disable auto-fixing (for CI)")
 		verbose     = flag.Bool("verbose", false, "Show detailed output")
@@ -62,14 +64,41 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Determine what to run
+	// Determine what to run based on flags
 	runRust := true
 	runSvelte := true
-	if *rustOnly || *rustOnly2 {
-		runSvelte = false
-	}
-	if *svelteOnly || *svelteOnly2 {
+	runWebsite := true
+	runLicenseServer := true
+
+	// --app flag takes precedence
+	if *appName != "" {
+		app := strings.ToLower(*appName)
 		runRust = false
+		runSvelte = false
+		runWebsite = false
+		runLicenseServer = false
+
+		switch app {
+		case "desktop":
+			runRust = true
+			runSvelte = true
+		case "website":
+			runWebsite = true
+		case "license-server":
+			runLicenseServer = true
+		default:
+			printError("Error: Unknown app: %s", *appName)
+			fmt.Fprintf(os.Stderr, "Available apps: desktop, website, license-server\n")
+			os.Exit(1)
+		}
+	} else if *rustOnly || *rustOnly2 {
+		runSvelte = false
+		runWebsite = false
+		runLicenseServer = false
+	} else if *svelteOnly || *svelteOnly2 {
+		runRust = false
+		runWebsite = false
+		runLicenseServer = false
 	}
 
 	fmt.Println("🔍 Running all checks...")
@@ -88,6 +117,18 @@ func main() {
 	if runSvelte {
 		svelteFailed, failedChecks := runSvelteChecks(ctx)
 		failed = svelteFailed || failed
+		allFailedChecks = append(allFailedChecks, failedChecks...)
+	}
+
+	if runWebsite {
+		websiteFailed, failedChecks := runWebsiteChecks(ctx)
+		failed = websiteFailed || failed
+		allFailedChecks = append(allFailedChecks, failedChecks...)
+	}
+
+	if runLicenseServer {
+		serverFailed, failedChecks := runLicenseServerChecks(ctx)
+		failed = serverFailed || failed
 		allFailedChecks = append(allFailedChecks, failedChecks...)
 	}
 

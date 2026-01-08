@@ -1,43 +1,107 @@
-# Astro Starter Kit: Minimal
+# Website
 
-```sh
-npm create astro@latest -- --template minimal
+Cmdr marketing website built with Astro and Tailwind CSS v4.
+
+## Overview
+
+A static landing page for [getcmdr.com](https://getcmdr.com) featuring:
+
+- AI-focused messaging (natural language file operations)
+- 7-day free trial CTA
+- Feature highlights
+- Download section
+- Linear.app-inspired dark design
+
+## Tech stack
+
+- **Astro** — Static site generator, zero JS by default
+- **Tailwind CSS v4** — Styling with CSS-first configuration
+- **Docker + nginx** — Production deployment
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start dev server
+pnpm run dev
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+The dev server runs at `http://localhost:4321`.
 
-## 🚀 Project Structure
+## Building
 
-Inside of your Astro project, you'll see the following folders and files:
+```bash
+# Build static site
+pnpm run build
 
-```text
-/
-├── public/
+# Preview production build
+pnpm run preview
+```
+
+Output goes to `dist/`.
+
+## Deployment
+
+The site is containerized for deployment to any Docker host.
+
+### Build and run locally
+
+```bash
+docker build -t getcmdr-static .
+docker run -p 8080:80 getcmdr-static
+```
+
+### Deploy to server
+
+```bash
+docker compose up -d --build
+```
+
+The `docker-compose.yml` expects a `caddy_network` for reverse proxy integration:
+
+```yaml
+# Caddyfile on server
+getcmdr.com { reverse_proxy getcmdr-static:80 }
+```
+
+## Project structure
+
+```
+apps/website/
 ├── src/
-│   └── pages/
-│       └── index.astro
+│   ├── components/
+│   │   ├── Header.astro     # Fixed navigation
+│   │   ├── Hero.astro       # Main hero section
+│   │   ├── Features.astro   # Feature grid
+│   │   ├── Download.astro   # Download CTA
+│   │   └── Footer.astro     # Footer
+│   ├── layouts/
+│   │   └── Layout.astro     # Base HTML layout
+│   ├── pages/
+│   │   └── index.astro      # Landing page
+│   └── styles/
+│       └── global.css       # Tailwind theme
+├── public/
+│   └── favicon.svg
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── astro.config.mjs
 └── package.json
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## Design
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+The design is inspired by [linear.app](https://linear.app):
 
-Any static assets, like images, can be placed in the `public/` directory.
+- Dark background (`#0a0a0b`)
+- Subtle gradients and grid patterns
+- Accent color: Indigo (`#6366f1`)
+- Inter font family
+- Smooth fade-in animations
 
-## 🧞 Commands
+## License
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+Proprietary. See [LICENSE](./LICENSE).

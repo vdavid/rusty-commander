@@ -37,6 +37,7 @@ pub mod config;
 mod file_system;
 mod font_metrics;
 pub mod icons;
+pub mod licensing;
 #[cfg(target_os = "macos")]
 mod macos_icons;
 mod menu;
@@ -243,7 +244,12 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             permissions::check_full_disk_access,
             #[cfg(target_os = "macos")]
-            permissions::open_privacy_settings
+            permissions::open_privacy_settings,
+            // Licensing commands
+            commands::licensing::get_license_status,
+            commands::licensing::activate_license,
+            commands::licensing::get_license_info,
+            commands::licensing::reset_trial
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

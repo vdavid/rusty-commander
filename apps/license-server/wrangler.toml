@@ -1,0 +1,13 @@
+name = "cmdr-license-server"
+main = "src/index.ts"
+compatibility_date = "2026-01-08"
+
+[vars]
+# Non-secret config
+PRODUCT_NAME = "Cmdr"
+SUPPORT_EMAIL = "veszelovszki@gmail.com"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+# - PADDLE_WEBHOOK_SECRET
+# - ED25519_PRIVATE_KEY
+# - RESEND_API_KEY

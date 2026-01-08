@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
     output: 'static',
     vite: {
+        // @ts-expect-error Vite version mismatch between Astro and Tailwind - doesn't affect build
         plugins: [tailwindcss()],
     },
 })

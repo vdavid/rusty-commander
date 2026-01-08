@@ -1,35 +1,36 @@
 {
-    "name": "@cmdr/website",
+    "name": "@cmdr/license-server",
     "version": "0.0.1",
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "astro dev",
-        "build": "astro build",
-        "preview": "astro preview",
-        "astro": "astro",
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "generate-keys": "node scripts/generate-keys.js",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "typecheck": "astro check"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
-        "@tailwindcss/vite": "^4.1.18",
-        "astro": "^5.16.7",
-        "tailwindcss": "^4.1.18"
+        "@noble/ed25519": "^3.0.0",
+        "hono": "^4.11.3",
+        "resend": "^6.6.0"
     },
     "devDependencies": {
-        "@astrojs/check": "^0.9.6",
+        "@cloudflare/workers-types": "^4.20260108.0",
         "@eslint/js": "^9.39.2",
         "eslint": "^9.39.2",
         "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-astro": "^1.5.0",
         "eslint-plugin-prettier": "^5.5.4",
         "globals": "^17.0.0",
         "prettier": "^3.7.4",
-        "prettier-plugin-astro": "^0.14.1",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.52.0"
+        "typescript-eslint": "^8.52.0",
+        "vitest": "^4.0.16",
+        "wrangler": "^4.58.0"
     }
 }

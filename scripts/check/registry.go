@@ -8,6 +8,7 @@ func getCheckByName(name string) Check {
 
 	// Map CLI names (with dashes, case-insensitive) to check types
 	switch nameLower {
+	// Rust checks
 	case "rustfmt":
 		return &RustfmtCheck{}
 	case "clippy":
@@ -20,6 +21,7 @@ func getCheckByName(name string) Check {
 		return &CargoUdepsCheck{}
 	case "rust-tests":
 		return &RustTestsCheck{}
+	// Desktop/Svelte checks
 	case "prettier":
 		return &PrettierCheck{}
 	case "eslint":
@@ -34,6 +36,24 @@ func getCheckByName(name string) Check {
 		return &SvelteTestsCheck{}
 	case "e2e-tests":
 		return &E2ETestsCheck{}
+	// Website checks
+	case "website-prettier":
+		return &WebsitePrettierCheck{}
+	case "website-eslint":
+		return &WebsiteESLintCheck{}
+	case "website-typecheck":
+		return &WebsiteTypecheckCheck{}
+	case "website-build":
+		return &WebsiteBuildCheck{}
+	// License server checks
+	case "license-server-prettier":
+		return &LicenseServerPrettierCheck{}
+	case "license-server-eslint":
+		return &LicenseServerESLintCheck{}
+	case "license-server-typecheck":
+		return &LicenseServerTypecheckCheck{}
+	case "license-server-tests":
+		return &LicenseServerTestsCheck{}
 	default:
 		// Try to find by exact name match (case-insensitive)
 		allChecks := getAllChecks()
@@ -52,6 +72,8 @@ func getAllChecks() []Check {
 	var checks []Check
 	checks = append(checks, getRustChecks()...)
 	checks = append(checks, getSvelteChecks()...)
+	checks = append(checks, getWebsiteChecks()...)
+	checks = append(checks, getLicenseServerChecks()...)
 	return checks
 }
 
@@ -67,7 +89,7 @@ func getRustChecks() []Check {
 	}
 }
 
-// getSvelteChecks returns all Svelte checks.
+// getSvelteChecks returns all Svelte/desktop checks.
 func getSvelteChecks() []Check {
 	return []Check{
 		&PrettierCheck{},
@@ -77,6 +99,26 @@ func getSvelteChecks() []Check {
 		&KnipCheck{},
 		&SvelteTestsCheck{},
 		&E2ETestsCheck{},
+	}
+}
+
+// getWebsiteChecks returns all website checks.
+func getWebsiteChecks() []Check {
+	return []Check{
+		&WebsitePrettierCheck{},
+		&WebsiteESLintCheck{},
+		&WebsiteTypecheckCheck{},
+		&WebsiteBuildCheck{},
+	}
+}
+
+// getLicenseServerChecks returns all license server checks.
+func getLicenseServerChecks() []Check {
+	return []Check{
+		&LicenseServerPrettierCheck{},
+		&LicenseServerESLintCheck{},
+		&LicenseServerTypecheckCheck{},
+		&LicenseServerTestsCheck{},
 	}
 }
 
@@ -96,6 +138,22 @@ func getCheckCLIName(check Check) string {
 		return "tests"
 	case "e2e tests":
 		return "e2e-tests"
+	case "prettier (website)":
+		return "website-prettier"
+	case "eslint (website)":
+		return "website-eslint"
+	case "typecheck (website)":
+		return "website-typecheck"
+	case "build (website)":
+		return "website-build"
+	case "prettier (license-server)":
+		return "license-server-prettier"
+	case "eslint (license-server)":
+		return "license-server-eslint"
+	case "typecheck (license-server)":
+		return "license-server-typecheck"
+	case "tests (license-server)":
+		return "license-server-tests"
 	default:
 		return name
 	}
