@@ -9,8 +9,11 @@ on:
             - main
 
 jobs:
-    rust-checks:
-        name: Rust
+    # ===========================================
+    # Desktop app - Rust backend
+    # ===========================================
+    desktop-rust:
+        name: Desktop (Rust)
         runs-on: ubuntu-latest
 
         steps:
@@ -61,8 +64,11 @@ jobs:
             - name: Run Rust tests
               run: ./scripts/check/check --check rust-tests --ci
 
-    svelte-checks:
-        name: Svelte
+    # ===========================================
+    # Desktop app - Svelte frontend
+    # ===========================================
+    desktop-svelte:
+        name: Desktop (Svelte)
         runs-on: ubuntu-latest
 
         steps:
@@ -79,9 +85,9 @@ jobs:
               uses: actions/cache@v4
               with:
                   path: ~/.pnpm-store
-                  key: ${{ runner.os }}-pnpm-${{ hashFiles('apps/desktop/pnpm-lock.yaml') }}
+                  key: ${{ runner.os }}-pnpm-desktop-${{ hashFiles('apps/desktop/pnpm-lock.yaml') }}
                   restore-keys: |
-                      ${{ runner.os }}-pnpm-
+                      ${{ runner.os }}-pnpm-desktop-
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
@@ -104,8 +110,11 @@ jobs:
             - name: Run Svelte tests
               run: ./scripts/check/check --check svelte-tests --ci
 
-    e2e-tests:
-        name: E2E Tests
+    # ===========================================
+    # Desktop app - E2E tests
+    # ===========================================
+    desktop-e2e:
+        name: Desktop (E2E)
         runs-on: ubuntu-latest
         timeout-minutes: 30
 
@@ -123,9 +132,9 @@ jobs:
               uses: actions/cache@v4
               with:
                   path: ~/.pnpm-store
-                  key: ${{ runner.os }}-pnpm-${{ hashFiles('apps/desktop/pnpm-lock.yaml') }}
+                  key: ${{ runner.os }}-pnpm-desktop-${{ hashFiles('apps/desktop/pnpm-lock.yaml') }}
                   restore-keys: |
-                      ${{ runner.os }}-pnpm-
+                      ${{ runner.os }}-pnpm-desktop-
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
@@ -142,7 +151,10 @@ jobs:
             - name: Run E2E tests
               run: ./scripts/check/check --check e2e-tests --ci
 
-    website-checks:
+    # ===========================================
+    # Website
+    # ===========================================
+    website:
         name: Website
         runs-on: ubuntu-latest
 
@@ -168,8 +180,24 @@ jobs:
               run: pnpm install --frozen-lockfile
               working-directory: ./apps/website
 
+            - name: Build check tool
+              run: go build -o check .
+              working-directory: ./scripts/check
+
+            - name: Check Prettier
+              run: ./scripts/check/check --check website-prettier --ci
+
+            - name: Run ESLint
+              run: ./scripts/check/check --check website-eslint --ci
+
+            - name: Run typecheck
+              run: ./scripts/check/check --check website-typecheck --ci
+
             - name: Build website
-              run: pnpm build
+              run: ./scripts/check/check --check website-build --ci
+
+            - name: Install Playwright browsers
+              run: pnpm exec playwright install --with-deps chromium
               working-directory: ./apps/website
 
             - name: Run Playwright tests
@@ -189,3 +217,48 @@ jobs:
                   name: lighthouse-report
                   path: apps/website/.lighthouseci/
                   retention-days: 7
+
+    # ===========================================
+    # License server
+    # ===========================================
+    license-server:
+        name: License server
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install mise
+              uses: jdx/mise-action@v2
+
+            - name: Install tools with mise
+              run: mise install
+
+            - name: Cache pnpm
+              uses: actions/cache@v4
+              with:
+                  path: ~/.pnpm-store
+                  key: ${{ runner.os }}-pnpm-license-server-${{ hashFiles('apps/license-server/pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-license-server-
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+              working-directory: ./apps/license-server
+
+            - name: Build check tool
+              run: go build -o check .
+              working-directory: ./scripts/check
+
+            - name: Check Prettier
+              run: ./scripts/check/check --check license-server-prettier --ci
+
+            - name: Run ESLint
+              run: ./scripts/check/check --check license-server-eslint --ci
+
+            - name: Run typecheck
+              run: ./scripts/check/check --check license-server-typecheck --ci
+
+            - name: Run tests
+              run: ./scripts/check/check --check license-server-tests --ci
