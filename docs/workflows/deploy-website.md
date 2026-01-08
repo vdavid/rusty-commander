@@ -7,8 +7,8 @@ checks pass.
 
 1. Push to `main` (or merge a PR)
 2. GitHub Actions runs the `website` job (Prettier, ESLint, typecheck, build, Playwright, Lighthouse)
-3. If all checks pass, the `deploy-website` job runs
-4. The deploy job SSHs into the server and:
+3. If all checks pass, the `deploy-website` job sends a webhook to the server
+4. The server verifies the signature and runs the deploy script:
    - Pulls the latest code
    - Rebuilds the Docker image
    - Restarts the container
@@ -35,36 +35,109 @@ sudo chown deploy-cmdr:deploy-cmdr /opt/cmdr
 sudo -u deploy-cmdr git clone https://github.com/vdavid/cmdr.git /opt/cmdr
 ```
 
-### 3. Generate an SSH key for GitHub Actions
+### 3. Install the webhook listener
+
+Download the `webhook` binary:
 
 ```bash
-# Switch to deploy-cmdr user
-sudo -u deploy-cmdr -i
+# Download and install webhook
+cd /tmp
+wget https://github.com/adnanh/webhook/releases/download/2.8.1/webhook-linux-amd64.tar.gz
+tar -xzf webhook-linux-amd64.tar.gz
+sudo mv webhook-linux-amd64/webhook /usr/local/bin/
+sudo chmod +x /usr/local/bin/webhook
 
-# Generate key
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/github_deploy -N ""
-
-# Authorize the key
-cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-
-# Display the private key (copy this to GitHub)
-cat ~/.ssh/github_deploy
+# Verify installation
+webhook --version
 ```
 
-### 4. Add secrets to GitHub
+### 4. Generate deployment secret
 
-Go to the repository → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+```bash
+# Generate a random secret
+openssl rand -hex 32
+```
 
-Add these secrets:
+Save this secret — you'll need it in two places:
 
-| Name             | Value                                                   |
-| ---------------- | ------------------------------------------------------- |
-| `SERVER_HOST`    | `37.27.245.171` (or `getcmdr.com`)                      |
-| `SERVER_USER`    | `deploy-cmdr`                                           |
-| `SERVER_SSH_KEY` | The private key from step 3 (including BEGIN/END lines) |
+1. On the server (step 5)
+2. In GitHub secrets (step 7)
 
-### 5. Set up Docker network and do the initial deploy
+### 5. Create the systemd service
+
+sudo nano `/etc/systemd/system/deploy-webhook.service`:
+
+```ini
+[Unit]
+Description=Deploy Webhook Listener
+After=network.target
+
+[Service]
+Type=simple
+User=deploy-cmdr
+Group=deploy-cmdr
+Environment="DEPLOY_WEBHOOK_SECRET=your-secret-from-step-4"
+ExecStart=/usr/local/bin/webhook -hooks /opt/cmdr/infra/deploy-webhook/hooks.json -port 9000 -verbose
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Remember to replace `your-secret-from-step-4` with the secret from step 4.
+
+Then enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable deploy-webhook
+sudo systemctl start deploy-webhook
+
+# Check it's running
+sudo systemctl status deploy-webhook
+```
+
+### 6. Configure Caddy
+
+Add the webhook handler to your Caddyfile. Update the `getcmdr.com` block:
+
+```
+getcmdr.com {
+    # Webhook endpoint for GitHub deploys
+    handle /hooks/* {
+        reverse_proxy localhost:9000
+    }
+
+    # Static site (default)
+    handle {
+        reverse_proxy getcmdr-static:80
+    }
+}
+
+www.getcmdr.com {
+    redir https://getcmdr.com{uri} permanent
+}
+```
+
+Then reload Caddy.
+
+```bash
+cd {Caddy folder}
+docker compose restart caddy
+```
+
+### 7. Add secrets to GitHub
+
+Go to https://github.com/vdavid/cmdr/settings/secrets/actions → **New repository secret**
+
+Add this secret:
+
+| Name                     | Value                      |
+| ------------------------ | -------------------------- |
+| `DEPLOY_WEBHOOK_SECRET`  | The secret from step 4     |
+
+### 8. Set up Docker network and do initial deploy
 
 ```bash
 # As deploy-cmdr user
@@ -78,37 +151,38 @@ docker network create proxy-net 2>/dev/null || true
 docker compose up -d --build
 ```
 
-### 6. Configure Caddy
-
-Add this to your Caddyfile:
-
-```
-getcmdr.com {
-    reverse_proxy getcmdr-static:80
-}
-
-www.getcmdr.com {
-    redir https://getcmdr.com{uri} permanent
-}
-```
-
-Then reload Caddy:
+### 9. Make deploy script executable
 
 ```bash
-docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+chmod +x /opt/cmdr/infra/deploy-webhook/deploy-website.sh
 ```
 
 ## Troubleshooting
 
 ### Check deployment logs
 
-In GitHub Actions, look at the `Deploy website` job output.
+```bash
+# Webhook service logs
+sudo journalctl -u deploy-webhook -f
 
-### Check container status on server
+# Or check recent logs
+sudo journalctl -u deploy-webhook --since "10 minutes ago"
+```
+
+### Check container status
 
 ```bash
 sudo -u deploy-cmdr docker ps
 sudo -u deploy-cmdr docker logs getcmdr-static
+```
+
+### Test the webhook locally
+
+```bash
+# From the server, test if the webhook is responding
+curl -X POST http://localhost:9000/hooks/deploy-website
+
+# Should return 403 (signature required) or 200 if signature is valid
 ```
 
 ### Manual deploy
@@ -125,16 +199,23 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
-### SSH connection issues
-
-Test the connection locally:
+### Webhook service not starting
 
 ```bash
-ssh -i /path/to/private/key deploy-cmdr@37.27.245.171
+# Check for errors
+sudo journalctl -u deploy-webhook -e
+
+# Verify the hooks.json is valid
+webhook -hooks /opt/cmdr/infra/deploy-webhook/hooks.json -verbose -nopanic
 ```
 
-If it fails, check:
+### Caddy not routing to webhook
 
-- Firewall allows port 22
-- SSH key permissions (`chmod 600`)
-- User is in the `authorized_keys` file
+Test that Caddy is forwarding correctly:
+
+```bash
+# From outside the server
+curl -v https://getcmdr.com/hooks/deploy-website
+```
+
+Should return a response from the webhook service (even if it's a 403 for missing signature).

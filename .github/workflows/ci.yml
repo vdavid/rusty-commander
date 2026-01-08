@@ -310,16 +310,14 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
         steps:
-            - name: Deploy to server via SSH
-              uses: appleboy/ssh-action@v1
-              with:
-                  host: ${{ secrets.SERVER_HOST }}
-                  username: ${{ secrets.SERVER_USER }}
-                  key: ${{ secrets.SERVER_SSH_KEY }}
-                  script: |
-                      cd /opt/cmdr
-                      git pull origin main
-                      cd apps/website
-                      docker compose down
-                      docker compose build --no-cache
-                      docker compose up -d
+            - name: Trigger deploy webhook
+              run: |
+                  # Compute HMAC-SHA256 signature
+                  PAYLOAD='{}'
+                  SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "${{ secrets.DEPLOY_WEBHOOK_SECRET }}" | cut -d' ' -f2)
+
+                  # Send signed request to webhook
+                  curl -f -X POST https://getcmdr.com/hooks/deploy-website \
+                    -H "Content-Type: application/json" \
+                    -H "X-Hub-Signature-256: sha256=$SIGNATURE" \
+                    -d "$PAYLOAD"

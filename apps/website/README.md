@@ -55,11 +55,9 @@ docker run -p 8080:80 getcmdr-static
 
 ### Deploy to server
 
-```bash
-docker compose up -d --build
-```
+The website is automatically deployed when changes are pushed to `main` and CI passes.
 
-The `docker-compose.yml` expects a `caddy_network` for reverse proxy integration:
+For server setup and troubleshooting, see [Deploying the website](../../docs/workflows/deploy-website.md).
 
 ```yaml
 # Caddyfile on server
