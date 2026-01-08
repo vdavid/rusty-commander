@@ -6,6 +6,8 @@ settings:
 
 importers:
 
+  .: {}
+
   apps/desktop:
     dependencies:
       '@crabnebula/tauri-plugin-drag':

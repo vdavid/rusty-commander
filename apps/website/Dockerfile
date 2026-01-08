@@ -7,18 +7,16 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy package files
-COPY package.json pnpm-lock.yaml* package-lock.json* ./
+COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then npm ci; \
-    else npm install; fi
+RUN pnpm install --frozen-lockfile
 
 # Copy source
 COPY . .
 
 # Build static site
-RUN npm run build
+RUN pnpm run build
 
 # Production stage - serve with nginx
 FROM nginx:alpine AS production

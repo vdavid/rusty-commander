@@ -6,8 +6,8 @@ services:
         container_name: getcmdr-static
         restart: unless-stopped
         networks:
-            - caddy_network
+            - proxy-net
 
 networks:
-    caddy_network:
+    proxy-net:
         external: true
