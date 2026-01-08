@@ -6,9 +6,12 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
     output: 'static',
     server: {
-        port: 4321,
+        port: parseInt(process.env.PORT || '4321'),
     },
     vite: {
+        server: {
+            strictPort: true,
+        },
         // @ts-expect-error Vite version mismatch between Astro and Tailwind - doesn't affect build
         plugins: [tailwindcss()],
     },
