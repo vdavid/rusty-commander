@@ -7,7 +7,7 @@ const currentYear = new Date().getFullYear()
         <div class="mb-8 grid grid-cols-2 gap-8 md:grid-cols-4">
             <!-- Logo -->
             <div class="col-span-2 md:col-span-1">
-                <a href="/" class="flex items-center gap-2">
+                <a href="/" class="flex items-center gap-2" aria-label="Cmdr home">
                     <span class="text-xl text-[var(--color-accent)]">⌘</span>
                     <span class="font-semibold">Cmdr</span>
                 </a>
@@ -16,20 +16,20 @@ const currentYear = new Date().getFullYear()
 
             <!-- Product -->
             <div>
-                <h4 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Product</h4>
-                <ul class="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                <p class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Product</p>
+                <ul class="space-y-2 text-sm">
                     <li>
-                        <a href="/#features" class="transition-colors hover:text-[var(--color-text-primary)]">
+                        <a href="/#features" class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]">
                             Features
                         </a>
                     </li>
                     <li>
-                        <a href="/pricing" class="transition-colors hover:text-[var(--color-text-primary)]">
+                        <a href="/pricing" class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]">
                             Pricing
                         </a>
                     </li>
                     <li>
-                        <a href="/#download" class="transition-colors hover:text-[var(--color-text-primary)]">
+                        <a href="/#download" class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]">
                             Download
                         </a>
                     </li>
@@ -38,12 +38,12 @@ const currentYear = new Date().getFullYear()
 
             <!-- Resources -->
             <div>
-                <h4 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Resources</h4>
-                <ul class="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                <p class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Resources</p>
+                <ul class="space-y-2 text-sm">
                     <li>
                         <a
                             href="https://github.com/vdavid/cmdr"
-                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                            class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]"
                         >
                             GitHub
                         </a>
@@ -51,7 +51,7 @@ const currentYear = new Date().getFullYear()
                     <li>
                         <a
                             href="https://github.com/vdavid/cmdr/issues"
-                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                            class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]"
                         >
                             Report an issue
                         </a>
@@ -59,7 +59,7 @@ const currentYear = new Date().getFullYear()
                     <li>
                         <a
                             href="https://github.com/vdavid/cmdr/blob/main/LICENSE"
-                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                            class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]"
                         >
                             Source license
                         </a>
@@ -69,23 +69,23 @@ const currentYear = new Date().getFullYear()
 
             <!-- Legal -->
             <div>
-                <h4 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Legal</h4>
-                <ul class="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                <p class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Legal</p>
+                <ul class="space-y-2 text-sm">
                     <li>
                         <a
                             href="/terms-and-conditions"
-                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                            class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]"
                         >
                             Terms of service
                         </a>
                     </li>
                     <li>
-                        <a href="/privacy-policy" class="transition-colors hover:text-[var(--color-text-primary)]">
+                        <a href="/privacy-policy" class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]">
                             Privacy policy
                         </a>
                     </li>
                     <li>
-                        <a href="/refund" class="transition-colors hover:text-[var(--color-text-primary)]">
+                        <a href="/refund" class="text-[var(--color-text-secondary)] underline decoration-[var(--color-border)] underline-offset-2 transition-colors hover:text-[var(--color-text-primary)] hover:decoration-[var(--color-text-tertiary)]">
                             Refund policy
                         </a>
                     </li>
