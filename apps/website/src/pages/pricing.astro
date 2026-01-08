@@ -1,0 +1,185 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Header from '../components/Header.astro'
+import Footer from '../components/Footer.astro'
+---
+
+<Layout title="Pricing — Cmdr" description="Cmdr pricing: $29 one-time purchase, lifetime updates, 7-day free trial.">
+    <Header />
+    <main class="mx-auto max-w-4xl px-6 pt-32 pb-24">
+        <!-- Hero -->
+        <header class="mb-16 text-center">
+            <h1 class="mb-4 text-4xl font-bold tracking-tight text-[var(--color-text-primary)] md:text-5xl">
+                One price. Forever yours.
+            </h1>
+            <p class="text-lg text-[var(--color-text-secondary)]">
+                No subscriptions. No feature gates. Just a file manager that respects your wallet.
+            </p>
+        </header>
+
+        <!-- Pricing Card -->
+        <div
+            class="mx-auto mb-16 max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8"
+        >
+            <div class="mb-6 text-center">
+                <div class="mb-2 text-sm text-[var(--color-text-tertiary)]">One-time purchase</div>
+                <div class="flex items-baseline justify-center gap-1">
+                    <span class="text-5xl font-bold text-[var(--color-text-primary)]">$29</span>
+                    <span class="text-[var(--color-text-tertiary)]">USD</span>
+                </div>
+            </div>
+
+            <ul class="mb-8 space-y-3">
+                <li class="flex items-start gap-3">
+                    <span class="mt-1 text-[var(--color-accent)]">✓</span>
+                    <span class="text-[var(--color-text-secondary)]"
+                        ><strong class="text-[var(--color-text-primary)]">Lifetime updates</strong> — every future version,
+                        forever</span
+                    >
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1 text-[var(--color-accent)]">✓</span>
+                    <span class="text-[var(--color-text-secondary)]"
+                        ><strong class="text-[var(--color-text-primary)]">Use on 2 machines</strong> — your desktop and laptop,
+                        for example</span
+                    >
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1 text-[var(--color-accent)]">✓</span>
+                    <span class="text-[var(--color-text-secondary)]"
+                        ><strong class="text-[var(--color-text-primary)]">Signed and notarized</strong> — no macOS Gatekeeper
+                        warnings</span
+                    >
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1 text-[var(--color-accent)]">✓</span>
+                    <span class="text-[var(--color-text-secondary)]"
+                        ><strong class="text-[var(--color-text-primary)]">Automatic updates</strong> — stay up to date effortlessly</span
+                    >
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1 text-[var(--color-accent)]">✓</span>
+                    <span class="text-[var(--color-text-secondary)]"
+                        ><strong class="text-[var(--color-text-primary)]">30-day refund</strong> — no questions asked</span
+                    >
+                </li>
+            </ul>
+
+            <a
+                href="#download"
+                class="block w-full rounded-lg bg-[var(--color-accent)] py-3 text-center font-medium text-white transition-all duration-200 hover:bg-[var(--color-accent-hover)] hover:shadow-lg hover:shadow-[var(--color-accent-glow)]"
+            >
+                Start 7-day free trial
+            </a>
+            <p class="mt-3 text-center text-sm text-[var(--color-text-tertiary)]">No credit card required</p>
+        </div>
+
+        <!-- The Honest Truth Section -->
+        <section class="mb-16">
+            <h2 class="mb-6 text-center text-2xl font-bold text-[var(--color-text-primary)]">
+                The honest truth about the trial
+            </h2>
+            <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+                <p class="mb-4 text-[var(--color-text-secondary)]">
+                    Look, we'll level with you: Cmdr is
+                    <strong class="text-[var(--color-text-primary)]">nagware</strong>. 🫣
+                </p>
+                <p class="mb-4 text-[var(--color-text-secondary)]">
+                    For 7 days, you get the full experience — every feature, no limitations. After that? An increasingly
+                    persistent popup will remind you that your trial has expired. It's not
+                    <em>aggressive</em>, but it's definitely
+                    <em>motivated</em>.
+                </p>
+                <p class="mb-4 text-[var(--color-text-secondary)]">
+                    We could lock you out entirely, but that felt mean. Instead, we're betting that if you use Cmdr for
+                    a week, you'll <em>want</em> to buy it — partly because it's genuinely useful, and partly to make the
+                    popup go away. 😅
+                </p>
+                <p class="text-[var(--color-text-secondary)]">
+                    It's a fair trade: you get a tool that makes file management faster, and we get to keep building it.
+                    Deal?
+                </p>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section>
+            <h2 class="mb-8 text-center text-2xl font-bold text-[var(--color-text-primary)]">
+                Frequently asked questions
+            </h2>
+
+            <div class="space-y-6">
+                <div class="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
+                    <h3 class="mb-2 font-semibold text-[var(--color-text-primary)]">
+                        Is it really one-time, or will you add a subscription later?
+                    </h3>
+                    <p class="text-[var(--color-text-secondary)]">
+                        It's really one-time. Your $29 gets you the current version and every future update. No
+                        subscription, no "premium tier," no "wait, that feature costs extra." We're allergic to that
+                        stuff.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
+                    <h3 class="mb-2 font-semibold text-[var(--color-text-primary)]">
+                        Can I use it on more than two machines?
+                    </h3>
+                    <p class="text-[var(--color-text-secondary)]">
+                        The license covers two machines. If you need more (work laptop, home desktop, secret lair
+                        computer, etc.), reach out to us — we're reasonable humans.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
+                    <h3 class="mb-2 font-semibold text-[var(--color-text-primary)]">
+                        Wait, the source code is open? Can I just compile it myself?
+                    </h3>
+                    <p class="text-[var(--color-text-secondary)]">
+                        Yep! Cmdr is <a
+                            href="https://github.com/vdavid/cmdr"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-[var(--color-accent)] underline underline-offset-2 hover:text-[var(--color-accent-hover)]"
+                            >open source (AGPL-3.0)</a
+                        >. You can absolutely clone the repo and compile it yourself. You'll need Rust, Node, and Xcode,
+                        and your build won't be signed (so macOS will show scary warnings). The $29 is for the
+                        convenience of a signed, notarized, auto-updating app.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
+                    <h3 class="mb-2 font-semibold text-[var(--color-text-primary)]">What if I regret the purchase?</h3>
+                    <p class="text-[var(--color-text-secondary)]">
+                        We offer a <a
+                            href="/refund"
+                            class="text-[var(--color-accent)] underline underline-offset-2 hover:text-[var(--color-accent-hover)]"
+                            >30-day, no-questions-asked refund</a
+                        >. Between the 7-day trial and the refund period, you have 37 days to decide. That's more than a
+                        month. Take your time.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
+                    <h3 class="mb-2 font-semibold text-[var(--color-text-primary)]">What about Windows and Linux?</h3>
+                    <p class="text-[var(--color-text-secondary)]">
+                        macOS only for now. Windows and Linux are on the roadmap. Your license will work on all
+                        platforms once they're available.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-5">
+                    <h3 class="mb-2 font-semibold text-[var(--color-text-primary)]">Do you offer team licenses?</h3>
+                    <p class="text-[var(--color-text-secondary)]">
+                        Not yet, but if you're a team looking for licenses, email us at
+                        <a
+                            href="mailto:legal@getcmdr.com"
+                            class="text-[var(--color-accent)] underline underline-offset-2 hover:text-[var(--color-accent-hover)]"
+                            >legal@getcmdr.com</a
+                        > and we'll figure something out.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <Footer />
+</Layout>

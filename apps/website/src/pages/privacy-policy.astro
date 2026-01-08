@@ -1,0 +1,204 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro'
+---
+
+<LegalLayout
+    title="Privacy policy"
+    description="How Cmdr collects, uses, and protects your personal data. GDPR compliant."
+    lastUpdated="2026-01-08"
+>
+    <p>
+        Your privacy matters to us. This policy explains what data we collect, why we collect it, and how we protect it.
+        We've tried to keep it readable — no walls of legalese.
+    </p>
+
+    <div class="highlight-box">
+        <p>
+            <strong>The short version:</strong> We collect minimal data. The website uses analytics and collects your email
+            if you subscribe. The app validates your license using a machine identifier. We don't sell your data. Ever.
+        </p>
+    </div>
+
+    <h2>1. Who we are</h2>
+    <p>
+        <strong>Rymdskottkärra AB</strong> (the "data controller") is responsible for your personal data. We're a Swedish
+        company located at:
+    </p>
+    <p>
+        Vattmyragränd 47<br />
+        177 39 Järfälla<br />
+        Sweden
+    </p>
+    <p>
+        For privacy-related questions, contact us at
+        <a href="mailto:legal@getcmdr.com">legal@getcmdr.com</a>.
+    </p>
+
+    <h2>2. What data we collect</h2>
+
+    <h3>On the website (getcmdr.com)</h3>
+    <ul>
+        <li>
+            <strong>Email address</strong> — if you subscribe to our newsletter or contact us
+        </li>
+        <li>
+            <strong>Analytics data</strong> — we use PostHog to understand how visitors use our website. This includes pages
+            visited, referrer, browser type, and approximate location (country level). PostHog may set cookies for this purpose.
+        </li>
+        <li>
+            <strong>Payment information</strong> — if you purchase a license, payment is handled by Paddle. We receive your
+            email and purchase details, but not your credit card number.
+        </li>
+    </ul>
+
+    <h3>In the desktop app</h3>
+    <ul>
+        <li>
+            <strong>Machine identifier</strong> — when validating your license, we generate a pseudonymous machine ID to prevent
+            license sharing across too many devices. This ID doesn't identify you personally.
+        </li>
+        <li>
+            <strong>License key</strong> — stored locally on your machine. We verify it cryptographically without contacting
+            our servers for every check.
+        </li>
+    </ul>
+
+    <h3>What we don't collect</h3>
+    <ul>
+        <li>File names, contents, or any data from your file system</li>
+        <li>Keystrokes, screenshots, or usage patterns within the app</li>
+        <li>Personal files or documents</li>
+    </ul>
+
+    <h2>3. Why we collect this data (legal basis)</h2>
+    <p>Under GDPR, we need a legal basis for processing your data:</p>
+    <ul>
+        <li>
+            <strong>Contract performance</strong> — machine ID for license validation (you need it to use the software you
+            purchased)
+        </li>
+        <li>
+            <strong>Legitimate interest</strong> — analytics to improve our website and product, fraud prevention
+        </li>
+        <li>
+            <strong>Consent</strong> — newsletter emails (you can unsubscribe anytime)
+        </li>
+    </ul>
+
+    <h2>4. How we use your data</h2>
+    <ul>
+        <li>To deliver and improve Cmdr</li>
+        <li>To process your license purchase</li>
+        <li>To send you product updates (if you subscribed)</li>
+        <li>To respond to your support requests</li>
+        <li>To analyze website traffic and improve our marketing</li>
+    </ul>
+
+    <h2>5. Who we share data with</h2>
+    <p>We only share data with service providers who help us operate Cmdr:</p>
+    <ul>
+        <li>
+            <strong>Paddle</strong> (payments) — processes purchases, handles taxes and invoicing. Based in the UK with GDPR-compliant
+            processing.
+            <a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener noreferrer"
+                >Paddle's privacy policy</a
+            >
+        </li>
+        <li>
+            <strong>PostHog</strong> (analytics) — helps us understand website usage. Cloud-hosted with EU data storage options.
+            <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer">PostHog's privacy policy</a>
+        </li>
+        <li>
+            <strong>Cloudflare</strong> (hosting) — hosts our license validation server in the European Union. <!-- TODO: Specify exact Cloudflare region once configured -->
+            <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer"
+                >Cloudflare's privacy policy</a
+            >
+        </li>
+    </ul>
+    <p>We don't sell your data. We don't share it with advertisers.</p>
+
+    <h2>6. Where we store your data</h2>
+    <p>
+        Your data is processed and stored in the European Union. Our license server runs on Cloudflare Workers in EU
+        regions. PostHog and Paddle are GDPR-compliant and have appropriate data processing agreements in place.
+    </p>
+
+    <h2>7. How long we keep your data</h2>
+    <ul>
+        <li>
+            <strong>Purchase records</strong> — kept for 7 years (Swedish accounting law requirement)
+        </li>
+        <li>
+            <strong>Email subscriptions</strong> — until you unsubscribe
+        </li>
+        <li>
+            <strong>Analytics data</strong> — typically 2 years, then aggregated or deleted
+        </li>
+        <li>
+            <strong>Machine identifiers</strong> — stored as long as your license is active
+        </li>
+    </ul>
+
+    <h2>8. Cookies</h2>
+    <p>We use cookies for:</p>
+    <ul>
+        <li>
+            <strong>Analytics</strong> — PostHog sets cookies to understand how you use our website. These are first-party
+            cookies.
+        </li>
+    </ul>
+    <p>We don't use third-party advertising cookies or cross-site tracking.</p>
+    <p>
+        You can disable cookies in your browser settings. The website will still work, but we won't be able to improve
+        it based on usage data.
+    </p>
+
+    <h2>9. Your rights (GDPR)</h2>
+    <p>As an EU resident, you have the right to:</p>
+    <ul>
+        <li>
+            <strong>Access</strong> — request a copy of your personal data
+        </li>
+        <li>
+            <strong>Rectification</strong> — correct inaccurate data
+        </li>
+        <li>
+            <strong>Erasure</strong> — request deletion of your data ("right to be forgotten")
+        </li>
+        <li>
+            <strong>Portability</strong> — receive your data in a machine-readable format
+        </li>
+        <li>
+            <strong>Object</strong> — object to processing based on legitimate interest
+        </li>
+        <li>
+            <strong>Withdraw consent</strong> — for newsletter subscriptions, unsubscribe anytime
+        </li>
+    </ul>
+    <p>
+        To exercise these rights, email us at
+        <a href="mailto:legal@getcmdr.com">legal@getcmdr.com</a>. We'll respond within 30 days.
+    </p>
+    <p>
+        You also have the right to lodge a complaint with the Swedish Authority for Privacy Protection (IMY) or your
+        local data protection authority.
+    </p>
+
+    <h2>10. Children's privacy</h2>
+    <p>
+        Cmdr is not directed at children under 16. We don't knowingly collect data from children. If you believe we
+        have, please contact us and we'll delete it.
+    </p>
+
+    <h2>11. Changes to this policy</h2>
+    <p>
+        We may update this policy occasionally. We'll notify you of significant changes via email (if you've purchased a
+        license) or by posting on our website. The "Last updated" date at the top tells you when it was last revised.
+    </p>
+
+    <h2>12. Contact</h2>
+    <p>
+        Questions about your data? Want to exercise your rights? Email us at
+        <a href="mailto:legal@getcmdr.com">legal@getcmdr.com</a>.
+    </p>
+</LegalLayout>

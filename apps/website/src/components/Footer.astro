@@ -3,35 +3,104 @@ const currentYear = new Date().getFullYear()
 ---
 
 <footer class="border-t border-[var(--color-border-subtle)] px-6 py-12">
-    <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
-        <!-- Logo -->
-        <div class="flex items-center gap-2">
-            <span class="text-xl text-[var(--color-accent)]">⌘</span>
-            <span class="font-semibold">Cmdr</span>
+    <div class="mx-auto max-w-6xl">
+        <div class="mb-8 grid grid-cols-2 gap-8 md:grid-cols-4">
+            <!-- Logo -->
+            <div class="col-span-2 md:col-span-1">
+                <a href="/" class="flex items-center gap-2">
+                    <span class="text-xl text-[var(--color-accent)]">⌘</span>
+                    <span class="font-semibold">Cmdr</span>
+                </a>
+                <p class="mt-2 text-sm text-[var(--color-text-tertiary)]">The AI-native file manager</p>
+            </div>
+
+            <!-- Product -->
+            <div>
+                <h4 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Product</h4>
+                <ul class="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                    <li>
+                        <a href="/#features" class="transition-colors hover:text-[var(--color-text-primary)]">
+                            Features
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/pricing" class="transition-colors hover:text-[var(--color-text-primary)]">
+                            Pricing
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/#download" class="transition-colors hover:text-[var(--color-text-primary)]">
+                            Download
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Resources -->
+            <div>
+                <h4 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Resources</h4>
+                <ul class="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                    <li>
+                        <a
+                            href="https://github.com/vdavid/cmdr"
+                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                        >
+                            GitHub
+                        </a>
+                    </li>
+                    <li>
+                        <a
+                            href="https://github.com/vdavid/cmdr/issues"
+                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                        >
+                            Report an issue
+                        </a>
+                    </li>
+                    <li>
+                        <a
+                            href="https://github.com/vdavid/cmdr/blob/main/LICENSE"
+                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                        >
+                            Source license
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Legal -->
+            <div>
+                <h4 class="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Legal</h4>
+                <ul class="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                    <li>
+                        <a
+                            href="/terms-and-conditions"
+                            class="transition-colors hover:text-[var(--color-text-primary)]"
+                        >
+                            Terms of service
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/privacy-policy" class="transition-colors hover:text-[var(--color-text-primary)]">
+                            Privacy policy
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/refund" class="transition-colors hover:text-[var(--color-text-primary)]">
+                            Refund policy
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
 
-        <!-- Links -->
-        <div class="flex items-center gap-6 text-sm text-[var(--color-text-secondary)]">
-            <a href="https://github.com/vdavid/cmdr" class="transition-colors hover:text-[var(--color-text-primary)]">
-                GitHub
-            </a>
-            <a
-                href="https://github.com/vdavid/cmdr/issues"
-                class="transition-colors hover:text-[var(--color-text-primary)]"
-            >
-                Issues
-            </a>
-            <a
-                href="https://github.com/vdavid/cmdr/blob/main/LICENSE"
-                class="transition-colors hover:text-[var(--color-text-primary)]"
-            >
-                License
-            </a>
+        <!-- Bottom bar -->
+        <div
+            class="flex flex-col items-center justify-between gap-4 border-t border-[var(--color-border-subtle)] pt-8 md:flex-row"
+        >
+            <p class="text-sm text-[var(--color-text-tertiary)]">
+                © {currentYear} Rymdskottkärra AB. All rights reserved.
+            </p>
+            <p class="text-sm text-[var(--color-text-tertiary)]">Made with ❤️ in Sweden</p>
         </div>
-
-        <!-- Copyright -->
-        <p class="text-sm text-[var(--color-text-tertiary)]">
-            © {currentYear} David Veszelovszki
-        </p>
     </div>
 </footer>

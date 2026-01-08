@@ -1,0 +1,96 @@
+---
+import Layout from './Layout.astro'
+import Header from '../components/Header.astro'
+import Footer from '../components/Footer.astro'
+
+interface Props {
+    title: string
+    description: string
+    lastUpdated: string
+}
+
+const { title, description, lastUpdated } = Astro.props
+---
+
+<Layout title={`${title} — Cmdr`} description={description}>
+    <Header />
+    <main class="mx-auto max-w-3xl px-6 pt-32 pb-24">
+        <header class="mb-12">
+            <h1 class="mb-4 text-4xl font-bold tracking-tight text-[var(--color-text-primary)]">
+                {title}
+            </h1>
+            <p class="text-sm text-[var(--color-text-tertiary)]">
+                Last updated: {lastUpdated}
+            </p>
+        </header>
+
+        <article class="legal-content">
+            <slot />
+        </article>
+    </main>
+    <Footer />
+</Layout>
+
+<style>
+    .legal-content :global(h2) {
+        margin-top: 2.5rem;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--color-text-primary);
+    }
+
+    .legal-content :global(h3) {
+        margin-top: 1.75rem;
+        margin-bottom: 0.75rem;
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--color-text-primary);
+    }
+
+    .legal-content :global(p) {
+        margin-bottom: 1rem;
+        line-height: 1.75;
+        color: var(--color-text-secondary);
+    }
+
+    .legal-content :global(ul) {
+        margin-bottom: 1rem;
+        padding-left: 1.5rem;
+        list-style-type: disc;
+    }
+
+    .legal-content :global(li) {
+        margin-bottom: 0.5rem;
+        line-height: 1.75;
+        color: var(--color-text-secondary);
+    }
+
+    .legal-content :global(a) {
+        color: var(--color-accent);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        transition: color 0.2s;
+    }
+
+    .legal-content :global(a:hover) {
+        color: var(--color-accent-hover);
+    }
+
+    .legal-content :global(strong) {
+        color: var(--color-text-primary);
+        font-weight: 600;
+    }
+
+    .legal-content :global(.highlight-box) {
+        margin: 1.5rem 0;
+        padding: 1.25rem 1.5rem;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 0.75rem;
+    }
+
+    .legal-content :global(.highlight-box p:last-child) {
+        margin-bottom: 0;
+    }
+</style>
