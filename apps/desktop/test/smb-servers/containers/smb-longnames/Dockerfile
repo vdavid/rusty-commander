@@ -9,7 +9,6 @@ RUN LONG_NAME="this_is_a_very_long_share_name_that_exceeds_two_hundred_character
     mkdir -p "/shares/${LONG_NAME}" && \
     echo "Long name content" > "/shares/${LONG_NAME}/readme.txt" && \
     mkdir -p "/shares/normal_share" && \
-    # Create a deeply nested long path
     NESTED_PATH="/shares/normal_share/$(printf 'a%.0s' {1..50})/$(printf 'b%.0s' {1..50})/$(printf 'c%.0s' {1..50})" && \
     mkdir -p "$NESTED_PATH" && \
     echo "Deep nested long path content" > "$NESTED_PATH/deep.txt"
