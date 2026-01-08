@@ -77,7 +77,7 @@ Type=simple
 User=deploy-cmdr
 Group=deploy-cmdr
 Environment="DEPLOY_WEBHOOK_SECRET=your-secret-from-step-4"
-ExecStart=/usr/local/bin/webhook -hooks /opt/cmdr/infra/deploy-webhook/hooks.json -port 9000 -verbose
+ExecStart=/usr/local/bin/webhook -hooks /opt/cmdr/infra/deploy-webhook/hooks.json -port 9000 -verbose -template
 Restart=always
 RestartSec=5
 
