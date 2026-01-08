@@ -1,0 +1,19 @@
+# Website Docker build - context is repo root
+# Only include what's needed for the website build
+
+# Ignore everything by default
+*
+
+# Allow workspace config
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+
+# Allow website app
+!apps/website/
+
+# But ignore website build artifacts and node_modules
+apps/website/node_modules
+apps/website/dist
+apps/website/.astro
+apps/website/playwright-report
+apps/website/test-results

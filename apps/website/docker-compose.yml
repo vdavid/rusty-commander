@@ -1,8 +1,8 @@
 services:
     getcmdr-static:
         build:
-            context: .
-            dockerfile: Dockerfile
+            context: ../..
+            dockerfile: apps/website/Dockerfile
         container_name: getcmdr-static
         restart: unless-stopped
         networks:

@@ -6,26 +6,30 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
+# Copy workspace config and lockfile from repo root
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Copy the website package.json
+COPY apps/website/package.json ./apps/website/
 
-# Copy source
-COPY . .
+# Install dependencies for website only
+RUN pnpm install --frozen-lockfile --filter "./apps/website"
+
+# Copy website source
+COPY apps/website/ ./apps/website/
 
 # Build static site
+WORKDIR /app/apps/website
 RUN pnpm run build
 
 # Production stage - serve with nginx
 FROM nginx:alpine AS production
 
 # Copy built static files
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/website/dist /usr/share/nginx/html
 
 # Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/website/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80
