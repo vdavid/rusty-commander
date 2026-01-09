@@ -412,7 +412,7 @@ The app should work offline for users who have already activated:
 1. **First activation**: Requires network
 2. **Subsequent launches**: Check local activation token, no network needed
 3. **Periodic re-validation**: Every 30 days, try to phone home to update `last_seen_at`
-4. **Grace period**: If re-validation fails, allow 7 days before requiring network
+4. **Grace period**: If re-validation fails, allow 14 days before requiring network
 
 ```rust
 pub fn check_activation_status() -> ActivationStatus {

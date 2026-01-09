@@ -111,7 +111,7 @@ See [docs/adr](docs/adr) for all key technical decisions, and the
 - **Clippy `--allow-dirty --allow-staged`** is used locally to allow auto-fixes even with uncommitted changes
 - **Paddle for payments**: Chosen for MoR model (handles taxes/invoicing), all-inclusive fees. See
   [ADR-014](docs/adr/014-payment-provider-paddle.md)
-- **AGPL + trial license model**: Source is open (AGPL), official binary has 7-day trial. See
+- **AGPL + trial license model**: Source is open (AGPL), official binary has 14-day trial. See
   [ADR-015](docs/adr/015-license-model-agpl-trial.md) and [licensing docs](docs/features/licensing.md)
 
 ## MCP

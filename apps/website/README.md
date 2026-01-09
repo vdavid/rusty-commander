@@ -7,7 +7,7 @@ Cmdr marketing website built with Astro and Tailwind CSS v4.
 A static landing page for [getcmdr.com](https://getcmdr.com) featuring:
 
 - AI-focused messaging (natural language file operations)
-- 7-day free trial CTA
+- 14-day free trial CTA
 - Feature highlights
 - Download section
 - Linear.app-inspired dark design

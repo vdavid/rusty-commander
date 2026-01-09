@@ -12,7 +12,7 @@ We chose Paddle as our payment provider for selling Cmdr licenses. Paddle acts a
 
 ### Context
 
-Cmdr is a paid desktop application with a 7-day trial. After the trial, users need to purchase a $29 one-time license. We need a payment solution that:
+Cmdr is a paid desktop application with a 14-day trial. After the trial, users need to purchase a $29 one-time license. We need a payment solution that:
 
 - Handles global payments (users worldwide)
 - Manages VAT/GST and tax compliance

@@ -6,7 +6,7 @@ Accepted
 
 ## Summary
 
-Cmdr uses AGPL-3.0 licensing with a 7-day trial built into the official binary. Users can freely view, modify, and compile the source code. The official signed binary includes a trial period; after 14 days, a $29 one-time license is required. This balances open source values with sustainable indie development.
+Cmdr uses AGPL-3.0 licensing with a 14-day trial built into the official binary. Users can freely view, modify, and compile the source code. The official signed binary includes a trial period; after 14 days, a $29 one-time license is required. This balances open source values with sustainable indie development.
 
 ## Context, problem, solution
 
@@ -45,7 +45,7 @@ We want to say "open source" honestly while still generating revenue from conven
 **AGPL + sell convenience** was chosen:
 
 1. **Source is AGPL-3.0**: Truly open source, anyone can view/modify/compile
-2. **Official binary has trial**: 7-day trial, then requires $29 license
+2. **Official binary has trial**: 14-day trial, then requires $29 license
 3. **Self-compilers are allowed**: If you compile it yourself, you can use it free (AGPL permits this)
 4. **Friction discourages mass redistribution**:
    - Compiling requires Rust + Node + Xcode

@@ -4,7 +4,7 @@ This document describes Cmdr's licensing and payment system.
 
 ## Overview
 
-Cmdr uses a **7-day trial with one-time purchase** model:
+Cmdr uses a **14-day trial with one-time purchase** model:
 
 1. Users download and try Cmdr for free for 14 days
 2. After the trial, a $29 one-time license is required
@@ -16,28 +16,24 @@ The source code is open under AGPL-3.0. Users can compile it themselves and use 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         Components                                   │
+│                             Components                              │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
 │  ┌─────────────────┐     ┌─────────────────┐     ┌───────────────┐  │
 │  │  getcmdr.com    │────▶│  Paddle         │────▶│ License       │  │
 │  │  (website)      │     │  (payment)      │     │ server        │  │
 │  └─────────────────┘     └─────────────────┘     └───────┬───────┘  │
-│                                                          │          │
 │                                                          ▼          │
-│                                                   ┌───────────────┐  │
-│                                                   │ Email         │  │
-│                                                   │ (Resend)      │  │
-│                                                   └───────┬───────┘  │
-│                                                          │          │
+│                                                  ┌───────────────┐  │
+│                                                  │ Email         │  │
+│                                                  │ (Resend)      │  │
+│                                                  └───────┬───────┘  │
 │                                                          ▼          │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Cmdr app                                                    │   │
-│  │  - Trial tracking (14 days)                                  │   │
-│  │  - License key input                                         │   │
-│  │  - Ed25519 signature validation (offline)                    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  Cmdr app                                                     │  │
+│  │  - Trial tracking (14 days)                                   │  │
+│  │  - License key input                                          │  │
+│  │  - Ed25519 signature validation (offline)                     │  │
+│  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -92,20 +88,20 @@ The app embeds the Ed25519 public key at compile time. Validation is purely loca
 
 ### Tauri app (`apps/desktop/src-tauri/src/licensing/`)
 
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module entry, shared types |
-| `trial.rs` | 7-day trial tracking using tauri-plugin-store |
-| `verification.rs` | Ed25519 signature validation |
+| File              | Purpose                                        |
+|-------------------|------------------------------------------------|
+| `mod.rs`          | Module entry, shared types                     |
+| `trial.rs`        | 14-day trial tracking using tauri-plugin-store |
+| `verification.rs` | Ed25519 signature validation                   |
 
 ### Tauri commands
 
-| Command | Description |
-|---------|-------------|
+| Command              | Description                                    |
+|----------------------|------------------------------------------------|
 | `get_license_status` | Returns `Licensed`, `Trial`, or `TrialExpired` |
-| `activate_license` | Validates and stores a license key |
-| `get_license_info` | Returns stored license info |
-| `reset_trial` | Debug only — resets trial for testing |
+| `activate_license`   | Validates and stores a license key             |
+| `get_license_info`   | Returns stored license info                    |
+| `reset_trial`        | Debug only — resets trial for testing          |
 
 ### License server (`apps/license-server/`)
 
@@ -126,9 +122,9 @@ See [license server README](../../apps/license-server/README.md) for full docume
 
 ## Pricing
 
-| Tier | Price | Includes |
-|------|-------|----------|
-| Trial | Free | 14 days full access |
+| Tier    | Price        | Includes                     |
+|---------|--------------|------------------------------|
+| Trial   | Free         | 14 days full access          |
 | License | $29 one-time | Lifetime updates, 2 machines |
 
 ## What paying users get
