@@ -43,12 +43,12 @@ them to customers via Resend.
 9. Paddle (sandbox): Click "New price", and add $29+tax, one-time purchase, rest random.
 10. Paddle (sandbox): Go to https://sandbox-vendors.paddle.com/notifications-v2, click New destination, add the webhook URL
     `https://cmdr-license-server.veszelovszki.workers.dev/webhook/paddle`, and tick event `transaction.completed`.
-11. Paddle (sandbox): Click "..." → Edit destination → copy "Secret key".
+11. Paddle (sandbox): Click "..." → Edit destination → copy "Secret key". (Looks like `pdl_ntfset_01keh5q...`)
 12. TODO: Paddle live!
-13. 
 13. Cloudflare: (first time only) `npx wrangler login` to log in to Cloudflare.
-14. Cloudflare: Set secrets:
-     - `npx wrangler secret put PADDLE_WEBHOOK_SECRET` - Paste the secret key from step 11.
+14. Cloudflare: Set secrets (supports both live and sandbox simultaneously):
+     - `npx wrangler secret put PADDLE_WEBHOOK_SECRET_SANDBOX` - From sandbox webhook (step 11)
+     - `npx wrangler secret put PADDLE_WEBHOOK_SECRET_LIVE` - From live webhook (once approved)
      - `npx wrangler secret put ED25519_PRIVATE_KEY` - From `keys/private.key`
      - `npx wrangler secret put RESEND_API_KEY` - From resend.com
 15. Safest to save `keys/private.key` in a secure store at this point and delete it from the file system.
@@ -59,7 +59,8 @@ them to customers via Resend.
 
 - Create `.dev.vars` with your secrets:
   ```
-  PADDLE_WEBHOOK_SECRET=your_paddle_secret
+  PADDLE_WEBHOOK_SECRET_SANDBOX=pdl_ntfset_xxx
+  PADDLE_WEBHOOK_SECRET_LIVE=pdl_ntfset_yyy
   ED25519_PRIVATE_KEY=your_private_key_hex
   RESEND_API_KEY=re_xxxxx
   ```
@@ -111,6 +112,6 @@ Then open http://localhost:3333 and click "Buy Cmdr".
 
 ## Architecture decisions
 
-- See [ADR 014: Payment provider choice](../docs/adr/014-payment-provider-paddle.md) for why Paddle
-- See [ADR 015: License model](../docs/adr/015-license-model-agpl-trial.md) for the AGPL + trial approach
-- See [Licensing feature docs](../docs/features/licensing.md) for the full feature overview
+- See [ADR 014: Payment provider choice](../../docs/adr/014-payment-provider-paddle.md) for why Paddle
+- See [ADR 015: License model](../../docs/adr/015-license-model-agpl-trial.md) for the AGPL + trial approach
+- See [Licensing feature docs](../../docs/features/licensing.md) for the full feature overview

@@ -8,6 +8,7 @@ PRODUCT_NAME = "Cmdr"
 SUPPORT_EMAIL = "veszelovszki@gmail.com"
 
 # Secrets (set via `wrangler secret put <NAME>`):
-# - PADDLE_WEBHOOK_SECRET
-# - ED25519_PRIVATE_KEY
-# - RESEND_API_KEY
+# - PADDLE_WEBHOOK_SECRET_LIVE     (from Paddle live dashboard)
+# - PADDLE_WEBHOOK_SECRET_SANDBOX  (from Paddle sandbox dashboard)
+# - ED25519_PRIVATE_KEY            (from generate-keys script)
+# - RESEND_API_KEY                 (from resend.com)

@@ -35,3 +35,20 @@ export async function verifyPaddleWebhook(body: string, signatureHeader: string,
     // Constant-time comparison
     return signature === expectedSignature
 }
+
+/**
+ * Verify webhook against multiple secrets (live + sandbox).
+ * Returns true if any secret matches.
+ */
+export async function verifyPaddleWebhookMulti(
+    body: string,
+    signatureHeader: string,
+    secrets: (string | undefined)[],
+): Promise<boolean> {
+    for (const secret of secrets) {
+        if (secret && (await verifyPaddleWebhook(body, signatureHeader, secret))) {
+            return true
+        }
+    }
+    return false
+}

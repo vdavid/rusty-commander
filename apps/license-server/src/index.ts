@@ -1,12 +1,17 @@
 import { Hono } from 'hono'
 import { generateLicenseKey, formatLicenseKey } from './license'
 import { sendLicenseEmail } from './email'
-import { verifyPaddleWebhook } from './paddle'
+import { verifyPaddleWebhookMulti } from './paddle'
 
 type Bindings = {
-    PADDLE_WEBHOOK_SECRET: string
+    // Paddle webhook secrets (both optional to support gradual rollout)
+    PADDLE_WEBHOOK_SECRET_LIVE?: string
+    PADDLE_WEBHOOK_SECRET_SANDBOX?: string
+    // Crypto keys
     ED25519_PRIVATE_KEY: string
+    // Email
     RESEND_API_KEY: string
+    // Config
     PRODUCT_NAME: string
     SUPPORT_EMAIL: string
 }
@@ -34,8 +39,11 @@ app.post('/webhook/paddle', async (c) => {
     const body = await c.req.text()
     const signature = c.req.header('Paddle-Signature') ?? ''
 
-    // Verify webhook signature
-    const isValid = await verifyPaddleWebhook(body, signature, c.env.PADDLE_WEBHOOK_SECRET)
+    // Verify webhook signature against both live and sandbox secrets
+    const isValid = await verifyPaddleWebhookMulti(body, signature, [
+        c.env.PADDLE_WEBHOOK_SECRET_LIVE,
+        c.env.PADDLE_WEBHOOK_SECRET_SANDBOX,
+    ])
     if (!isValid) {
         return c.json({ error: 'Invalid signature' }, 401)
     }
@@ -79,10 +87,12 @@ app.post('/webhook/paddle', async (c) => {
 })
 
 // Manual license generation (for testing or customer service)
-// Protected by a simple secret in production
+// Protected by bearer token matching either live or sandbox webhook secret
 app.post('/admin/generate', async (c) => {
     const authHeader = c.req.header('Authorization')
-    if (authHeader !== `Bearer ${c.env.PADDLE_WEBHOOK_SECRET}`) {
+    const validSecrets = [c.env.PADDLE_WEBHOOK_SECRET_LIVE, c.env.PADDLE_WEBHOOK_SECRET_SANDBOX].filter(Boolean)
+    const isAuthorized = validSecrets.some((secret) => authHeader === `Bearer ${secret}`)
+    if (!isAuthorized) {
         return c.json({ error: 'Unauthorized' }, 401)
     }
 
