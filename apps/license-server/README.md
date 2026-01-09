@@ -31,68 +31,43 @@ them to customers via Resend.
 
 ## Setup
 
-### 1. Install dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Generate Ed25519 key pair
-
-```bash
-pnpm run generate-keys
-```
-
-This creates:
-
-- `keys/private.key` — Keep secret, set as Cloudflare secret
-- `keys/public.key` — Embed in Tauri app
-
-**Important:** Never commit the private key. The `keys/` folder is in `.gitignore`.
-
-### 3. Copy public key to Tauri app
-
-Edit `apps/desktop/src-tauri/src/licensing/verification.rs` line 12:
-
-```rust
-const PUBLIC_KEY_HEX: &str = "your-64-character-public-key-here";
-```
-
-### 4. Set Cloudflare secrets
-
-```bash
-# Login to Cloudflare (first time only)
-npx wrangler login
-
-# Set secrets
-npx wrangler secret put PADDLE_WEBHOOK_SECRET   # From Paddle dashboard
-npx wrangler secret put ED25519_PRIVATE_KEY     # From keys/private.key
-npx wrangler secret put RESEND_API_KEY          # From resend.com
-```
-
-### 5. Deploy
-
-```bash
-pnpm run deploy
-```
-
-Your server will be at: `https://cmdr-license-server.<your-subdomain>.workers.dev`
+1. `pnpm install` to install dependencies
+2. Gen Ed25519 pair: `pnpm run generate-keys` → `keys/public.key` (use in step 2) and `keys/private.key` (use in step 8)
+3. Copy public key to `PUBLIC_KEY_HEX` in [`verification.rs`](../desktop/src-tauri/src/licensing/verification.rs)).
+4. Resend: Sign up for / log in to resend.com, and create API key [here](https://resend.com/api-keys) or during onboarding.
+5. Resend: Go to https://resend.com/domains, and add getcmdr.com. Let it adds its DNS records to Cloudflare. 
+6. Paddle: (first time only) Create a Paddle account at https://paddle.com.
+7. Paddle: (first time only) Also create a Paddle sandbox account at https://sandbox-vendors.paddle.com/.
+8. Paddle (sandbox): Go to https://sandbox-vendors.paddle.com/products-v2, click New product, and crate "Cmdr" or sg,
+   "Standard digital goods" cat, some description.
+9. Paddle (sandbox): Click "New price", and add $29+tax, one-time purchase, rest random.
+10. Paddle (sandbox): Go to https://sandbox-vendors.paddle.com/notifications-v2, click New destination, add the webhook URL
+    `https://cmdr-license-server.veszelovszki.workers.dev/webhook/paddle`, and tick event `transaction.completed`.
+11. Paddle (sandbox): Click "..." → Edit destination → copy "Secret key".
+12. TODO: Paddle live!
+13. 
+13. Cloudflare: (first time only) `npx wrangler login` to log in to Cloudflare.
+14. Cloudflare: Set secrets:
+     - `npx wrangler secret put PADDLE_WEBHOOK_SECRET` - Paste the secret key from step 11.
+     - `npx wrangler secret put ED25519_PRIVATE_KEY` - From `keys/private.key`
+     - `npx wrangler secret put RESEND_API_KEY` - From resend.com
+15. Safest to save `keys/private.key` in a secure store at this point and delete it from the file system.
+16. Cloudflare: Deploy worker: `pnpm run deploy`. Should output `https://cmdr-license-server.veszelovszki.workers.dev`.
+17. Go to Sandbox/Notifications at https://sandbox-vendors.paddle.com/notifications-v2
 
 ## Local development
 
-Create `.dev.vars` with your secrets:
+- Create `.dev.vars` with your secrets:
+  ```
+  PADDLE_WEBHOOK_SECRET=your_paddle_secret
+  ED25519_PRIVATE_KEY=your_private_key_hex
+  RESEND_API_KEY=re_xxxxx
+  ```
+- Run `pnpm run dev`.
+- Test it with `4000 0566 5566 5556` / CVC: `100`, or one of the other test cards from
+  https://developer.paddle.com/concepts/payment-methods/credit-debit-card#test-payment-details.
 
-```
-PADDLE_WEBHOOK_SECRET=your_paddle_secret
-ED25519_PRIVATE_KEY=your_private_key_hex
-RESEND_API_KEY=re_xxxxx
-```
-
-Then run:
-
-```bash
-pnpm run dev
-```
+purchase URLs: https://sandbox-vendors.paddle.com/checkout/new?product_id=123456
 
 ## Endpoints
 
@@ -102,20 +77,6 @@ pnpm run dev
 | `POST` | `/webhook/paddle` | Paddle webhook (generates and emails license)    |
 | `POST` | `/admin/generate` | Manual license generation (requires auth header) |
 
-## Paddle configuration
-
-1. Create a product ($29 one-time purchase)
-2. Go to Developer Tools → Notifications
-3. Add webhook URL: `https://cmdr-license-server.<subdomain>.workers.dev/webhook/paddle`
-4. Select event: `transaction.completed`
-5. Copy the webhook secret to Cloudflare
-
-## Resend configuration
-
-1. Sign up at [resend.com](https://resend.com) (free tier: 100 emails/day)
-2. Add and verify your domain (`getcmdr.com`)
-3. Create an API key
-4. Set as Cloudflare secret
 
 ## Architecture decisions
 
