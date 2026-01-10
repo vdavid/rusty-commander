@@ -236,8 +236,7 @@ jobs:
               working-directory: ./apps/website
 
             - name: Run Playwright tests
-              run: pnpm test:e2e
-              working-directory: ./apps/website
+              run: ./scripts/check/check --check website-e2e-tests --ci
 
             - name: Run Lighthouse CI
               run: pnpm test:lighthouse

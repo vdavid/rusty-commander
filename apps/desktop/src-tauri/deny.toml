@@ -23,7 +23,7 @@ allow = [
     "MPL-2.0",
     "Unicode-3.0",
     "CC0-1.0",
-    "AGPL-3.0-or-later",
+    "LicenseRef-BSL-1.1",       # Our own crate (Business Source License 1.1)
     "NCSA",                     # For libfuzzer-sys (transitive dependency of image crate)
     "BSL-1.0",                  # For clipboard-win (transitive dependency of tauri-plugin-clipboard-manager)
     "CDLA-Permissive-2.0",      # For webpki-roots (TLS cert verification via reqwest)

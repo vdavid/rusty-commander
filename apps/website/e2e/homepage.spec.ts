@@ -26,9 +26,9 @@ test.describe('Homepage', () => {
     test('displays pricing information', async ({ page }) => {
         await page.goto('/')
 
-        // Check for pricing mention ($29 or free trial)
+        // Check for pricing mention ($59/yr or free for personal use)
         const pageContent = await page.textContent('body')
-        expect(pageContent).toMatch(/\$29|free.*trial|14.*day/i)
+        expect(pageContent).toMatch(/\$59|free.*personal|14.*day/i)
     })
 
     test('has navigation header', async ({ page }) => {

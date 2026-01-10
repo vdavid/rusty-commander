@@ -100,6 +100,25 @@ func (c *WebsiteBuildCheck) Run(ctx *CheckContext) error {
 	return nil
 }
 
+// WebsiteE2ETestsCheck runs Playwright E2E tests on the website.
+type WebsiteE2ETestsCheck struct{}
+
+func (c *WebsiteE2ETestsCheck) Name() string { return "E2E tests (website)" }
+
+func (c *WebsiteE2ETestsCheck) Run(ctx *CheckContext) error {
+	websiteDir := filepath.Join(ctx.RootDir, "apps", "website")
+
+	cmd := exec.Command("pnpm", "test:e2e")
+	cmd.Dir = websiteDir
+	output, err := runCommand(cmd, true)
+	if err != nil {
+		fmt.Println()
+		fmt.Print(indentOutput(output, "      "))
+		return fmt.Errorf("e2e tests failed")
+	}
+	return nil
+}
+
 // --- License server checks ---
 
 // LicenseServerPrettierCheck runs Prettier on the license server.

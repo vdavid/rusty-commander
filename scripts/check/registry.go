@@ -45,6 +45,8 @@ func getCheckByName(name string) Check {
 		return &WebsiteTypecheckCheck{}
 	case "website-build":
 		return &WebsiteBuildCheck{}
+	case "website-e2e-tests":
+		return &WebsiteE2ETestsCheck{}
 	// License server checks
 	case "license-server-prettier":
 		return &LicenseServerPrettierCheck{}
@@ -109,6 +111,7 @@ func getWebsiteChecks() []Check {
 		&WebsiteESLintCheck{},
 		&WebsiteTypecheckCheck{},
 		&WebsiteBuildCheck{},
+		&WebsiteE2ETestsCheck{},
 	}
 }
 
@@ -146,6 +149,8 @@ func getCheckCLIName(check Check) string {
 		return "website-typecheck"
 	case "build (website)":
 		return "website-build"
+	case "e2e tests (website)":
+		return "website-e2e-tests"
 	case "prettier (license-server)":
 		return "license-server-prettier"
 	case "eslint (license-server)":
