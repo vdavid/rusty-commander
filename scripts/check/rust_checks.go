@@ -46,9 +46,9 @@ func (c *ClippyCheck) Run(ctx *CheckContext) error {
 	rustDir := filepath.Join(ctx.RootDir, "apps", "desktop", "src-tauri")
 	var cmd *exec.Cmd
 	if ctx.CI {
-		cmd = exec.Command("cargo", "clippy", "--", "-D", "warnings")
+		cmd = exec.Command("cargo", "clippy", "--all-targets", "--", "-D", "warnings")
 	} else {
-		cmd = exec.Command("cargo", "clippy", "--fix", "--allow-dirty", "--allow-staged", "--", "-D", "warnings")
+		cmd = exec.Command("cargo", "clippy", "--all-targets", "--fix", "--allow-dirty", "--allow-staged", "--", "-D", "warnings")
 	}
 	cmd.Dir = rustDir
 	output, err := runCommand(cmd, true)
